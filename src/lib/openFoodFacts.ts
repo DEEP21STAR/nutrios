@@ -1,0 +1,103 @@
+/**
+ * Open Food Facts lookup — same public API already proven in tonight's CLI
+ * build. Free, no key required, CORS-open (world.openfoodfacts.org serves
+ * `Access-Control-Allow-Origin: *`). Used to turn a food NAME identified by
+ * the vision model into real macro numbers (calories/protein/fat/carbs) per
+ * 100g, which we then scale by the vision model's estimated portion size.
+ */
+
+export interface OffMacros {
+  code: string
+  productName: string
+  caloriesPer100g: number
+  proteinPer100gG: number
+  fatPer100gG: number
+  carbsPer100gG: number
+}
+
+interface OffSearchResponse {
+  products?: Array<{
+    code?: string
+    product_name?: string
+    product_name_en?: string
+    nutriments?: Record<string, number>
+  }>
+}
+
+/**
+ * Searches Open Food Facts by free-text food name and returns the best-match
+ * macro profile (per 100g), or null if nothing usable was found. Real network
+ * call — no mock/fallback data invented here; a null result means the UI's
+ * editable confirm step is genuinely empty for that item and the user fills
+ * it in by hand (see the manual-text-search fallback requirement).
+ *
+ * Retries once after a short delay on a 5xx — found live during core-loop
+ * testing: the public API returned a real (not hypothetical) transient 503
+ * "Page temporarily unavailable" for one request, which had fully recovered
+ * 3 seconds later on a plain retry. Without this, that single hiccup would
+ * silently zero out an item's macros in the confirm screen.
+ */
+export async function lookupFoodMacros(query: string): Promise<OffMacros | null> {
+  const url = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(
+    query,
+  )}&search_simple=1&action=process&json=1&page_size=5&fields=code,product_name,product_name_en,nutriments`
+
+  let res = await fetch(url)
+  if (!res.ok && res.status >= 500) {
+    await new Promise((r) => setTimeout(r, 1500))
+    res = await fetch(url)
+  }
+  if (!res.ok) throw new Error(`Open Food Facts request failed: ${res.status}`)
+  const data = (await res.json()) as OffSearchResponse
+
+  const candidates = (data.products ?? []).filter(
+    (p) => typeof p.nutriments?.['energy-kcal_100g'] === 'number',
+  )
+  if (candidates.length === 0) return null
+
+  // Real finding from live testing: Open Food Facts' free-text search ranking
+  // is not reliable enough to trust the raw top hit — searching "olives"
+  // returned "Alvalle Gazpacho" (a soup) as result #1. Prefer a candidate
+  // whose product name genuinely contains the search term (tolerating simple
+  // singular/plural mismatches, e.g. "olives" vs "olive") before falling
+  // back to the raw top match.
+  //
+  // KNOWN, UNRESOLVED LIMITATION (found live, not fixed here — flagged to
+  // the coordinator): Open Food Facts is a barcode/branded-product database,
+  // not a generic whole-food nutrition database. For "olives" specifically,
+  // even the top 15 results contain no genuine whole-olive product at all —
+  // just olive OIL (~900 kcal/100g, wildly wrong for the fruit) and unrelated
+  // items. Generic single-ingredient whole foods (raw fruit/veg, plain meats)
+  // are exactly where this API is weakest; branded/packaged items match well.
+  // The editable confirm step is the real safety net for this — a wrong
+  // auto-match is visibly editable before anything is logged, never silently
+  // trusted.
+  const singularOrPlural = (w: string) => (w.endsWith('s') ? [w, w.slice(0, -1)] : [w, `${w}s`])
+  const queryWords = query.toLowerCase().split(/\s+/).filter(Boolean).flatMap(singularOrPlural)
+  const nameMatch = candidates.find((p) => {
+    const name = (p.product_name_en || p.product_name || '').toLowerCase()
+    return queryWords.some((w) => name.includes(w))
+  })
+
+  const best = nameMatch ?? candidates[0]
+  const n = best.nutriments!
+  return {
+    code: best.code ?? '',
+    productName: best.product_name_en || best.product_name || query,
+    caloriesPer100g: n['energy-kcal_100g'] ?? 0,
+    proteinPer100gG: n['proteins_100g'] ?? 0,
+    fatPer100gG: n['fat_100g'] ?? 0,
+    carbsPer100gG: n['carbohydrates_100g'] ?? 0,
+  }
+}
+
+/** Scales a per-100g macro profile to an estimated portion size in grams. */
+export function scaleToPortion(off: OffMacros, grams: number) {
+  const factor = grams / 100
+  return {
+    calories: Math.round(off.caloriesPer100g * factor),
+    proteinG: Math.round(off.proteinPer100gG * factor * 10) / 10,
+    fatG: Math.round(off.fatPer100gG * factor * 10) / 10,
+    carbsG: Math.round(off.carbsPer100gG * factor * 10) / 10,
+  }
+}
