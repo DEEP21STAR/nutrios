@@ -1,5 +1,99 @@
 import { useEffect, useRef, useState } from 'react'
-import { cn } from '@/lib/utils'
+import gsap from 'gsap'
+import { cn, prefersReducedMotion } from '@/lib/utils'
+
+/**
+ * NUTRIOS Input Orb — collapsed state. 64px floating glassmorphic button
+ * with a GSAP breathing loop (an idle "it's alive" cue, not CSS keyframes,
+ * so it can be killed cleanly and is trivially gated by
+ * prefers-reduced-motion). This is the ONLY entry point into Photo mode.
+ */
+export function InputOrbButton({ onClick }: { onClick: () => void }) {
+  const orbRef = useRef<HTMLButtonElement>(null)
+  const glowRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const orb = orbRef.current
+    const glow = glowRef.current
+    if (!orb || !glow || prefersReducedMotion()) return
+    const tl = gsap.timeline({ repeat: -1, yoyo: true, defaults: { duration: 1.8, ease: 'sine.inOut' } })
+    tl.to(orb, { scale: 1.08 }, 0)
+    tl.to(glow, { scale: 1.35, opacity: 0.95 }, 0)
+    return () => {
+      tl.kill()
+    }
+  }, [])
+
+  return (
+    <div className="fixed bottom-6 left-1/2 z-40 -translate-x-1/2">
+      <div
+        ref={glowRef}
+        aria-hidden
+        className="absolute inset-0 rounded-full blur-xl"
+        style={{ background: 'var(--glow-ai)', opacity: 0.55 }}
+      />
+      <button
+        ref={orbRef}
+        onClick={onClick}
+        aria-label="Log a meal"
+        className="glass relative grid h-16 w-16 place-items-center rounded-full text-2xl shadow-[0_0_24px_4px_var(--glow-ai)] transition active:scale-90"
+      >
+        <span aria-hidden>📷</span>
+      </button>
+    </div>
+  )
+}
+
+/** Emerald corner-bracket viewfinder decoration — the reusable "AI is watching"
+ * treatment. Purely decorative styling framework here (no live per-frame
+ * detection exists in this pipeline — identification happens once, after the
+ * shutter); the same bracket/tag visual language is reused for real detected
+ * items over on the confirm screen (see ConfirmLog.tsx). */
+function ViewfinderBrackets() {
+  const corner = 'absolute h-8 w-8 border-[3px] border-accent-health drop-shadow-[0_0_8px_var(--glow-health)]'
+  return (
+    <div className="pointer-events-none absolute inset-6 sm:inset-10">
+      <div className={cn(corner, 'top-0 left-0 rounded-tl-lg border-r-0 border-b-0')} />
+      <div className={cn(corner, 'top-0 right-0 rounded-tr-lg border-l-0 border-b-0')} />
+      <div className={cn(corner, 'bottom-0 left-0 rounded-bl-lg border-r-0 border-t-0')} />
+      <div className={cn(corner, 'bottom-0 right-0 rounded-br-lg border-l-0 border-t-0')} />
+    </div>
+  )
+}
+
+/**
+ * Three genuinely distinct capture paths, not one input trying to do
+ * everything. Per the HTML spec / MDN's documented `capture` attribute
+ * behavior (not guessed): its PRESENCE hints the UA to open a capture UI
+ * (camera/mic) directly; its ABSENCE lets the UA present its normal
+ * media-selection UI (photo library + on-device files, and often camera
+ * too, presented by the OS/browser — a web page cannot force "gallery
+ * only" vs "files only" any further than that, there is no separate HTML
+ * lever for it on either iOS Safari or Android Chrome).
+ * So: "Take a Photo" forces the camera via `capture="environment"`
+ * (useful even when the live getUserMedia preview isn't available, e.g.
+ * permission denied for live preview but the native camera app still
+ * works). "Photos & Files" drops `capture` entirely so the OS's own
+ * chooser — which is what actually splits Photos vs Files vs Camera on
+ * both platforms — takes over. This was NOT verified on a physical
+ * iOS/Android device in this session (none available here); it follows
+ * documented spec behavior rather than a guess, and should get one real
+ * on-device check before shipping.
+ */
+function UploadOptions({ onFile }: { onFile: (e: React.ChangeEvent<HTMLInputElement>) => void }) {
+  return (
+    <div className="flex w-full flex-col gap-2">
+      <label className="glass flex cursor-pointer items-center justify-center gap-2 rounded-full px-6 py-3 text-subtitle font-semibold text-accent-health shadow-[0_0_24px_4px_var(--glow-health)] transition active:scale-95">
+        <span aria-hidden>📸</span> Take a Photo
+        <input type="file" accept="image/*" capture="environment" className="hidden" onChange={onFile} />
+      </label>
+      <label className="glass flex cursor-pointer items-center justify-center gap-2 rounded-full px-6 py-3 text-subtitle font-semibold text-accent-ai shadow-[0_0_24px_4px_var(--glow-ai)] transition active:scale-95">
+        <span aria-hidden>🖼️</span> Photos &amp; Files
+        <input type="file" accept="image/*" className="hidden" onChange={onFile} />
+      </label>
+    </div>
+  )
+}
 
 /**
  * Core-loop step 1: camera capture. Uses a real `getUserMedia` live preview
@@ -9,6 +103,12 @@ import { cn } from '@/lib/utils'
  * common failure mode (desktop browsers with no camera, iOS Safari camera
  * permission denied in a PWA context, etc.), not a hypothetical, so the
  * fallback is a first-class path rather than an error dead-end.
+ *
+ * Visual layer only, restyled to the NUTRIOS Cinematic Tech spec: the panel
+ * enters with a GSAP elastic-spring expansion from the orb's position
+ * (skipped for prefers-reduced-motion, which gets a plain 200ms fade
+ * instead), and Cancel plays the same spring in reverse before actually
+ * unmounting. Detection/capture logic below is completely unchanged.
  */
 export function CameraCapture({
   onCapture,
@@ -19,8 +119,51 @@ export function CameraCapture({
 }) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
   const [error, setError] = useState<string | null>(null)
   const [ready, setReady] = useState(false)
+  const [closing, setClosing] = useState(false)
+  const [showUploadOptions, setShowUploadOptions] = useState(false)
+
+  // Elastic-spring entrance. Spec pseudocode gives a spring in
+  // stiffness/damping/mass terms (300/30/0.8); GSAP's real elastic ease API
+  // takes (amplitude, period) instead, which are not the same units and
+  // don't convert 1:1. That stiffness/damping/mass combo works out to a
+  // damping ratio of ~0.97 (just under critical) — i.e. a fast settle with
+  // only a hint of overshoot, not a big wobble — so amplitude 1 / period
+  // 0.4 was chosen to reproduce that *character* (quick, slightly springy,
+  // no bounce-back-and-forth), not a literal unit conversion.
+  useEffect(() => {
+    const el = panelRef.current
+    if (!el) return
+    if (prefersReducedMotion()) {
+      gsap.set(el, { opacity: 1, scale: 1 })
+      return
+    }
+    gsap.fromTo(
+      el,
+      { scale: 0.15, opacity: 0, borderRadius: 9999 },
+      { scale: 1, opacity: 1, borderRadius: 0, duration: 0.9, ease: 'elastic.out(1, 0.4)', transformOrigin: '50% 100%' },
+    )
+  }, [])
+
+  function playExitThen(cb: () => void) {
+    const el = panelRef.current
+    if (!el || prefersReducedMotion()) {
+      cb()
+      return
+    }
+    setClosing(true)
+    gsap.to(el, {
+      scale: 0.15,
+      opacity: 0,
+      borderRadius: 9999,
+      duration: 0.45,
+      ease: 'power3.in',
+      transformOrigin: '50% 100%',
+      onComplete: cb,
+    })
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -89,46 +232,86 @@ export function CameraCapture({
     if (file) onCapture(file)
   }
 
+  function cancel() {
+    playExitThen(onCancel)
+  }
+
   const useFallback = error != null
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-black">
+    <div
+      ref={panelRef}
+      className={cn('fixed inset-0 z-50 flex flex-col overflow-hidden bg-bg-primary', closing && 'pointer-events-none')}
+    >
       {useFallback ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-4 p-6 text-center text-slate-200">
-          <p className="text-sm text-slate-400">
-            {error === 'no-getUserMedia'
-              ? 'Live camera preview is not available in this browser.'
-              : error === 'timeout'
-                ? 'Camera preview is taking too long to start.'
-                : 'Camera permission was denied or no camera was found.'}
-          </p>
-          <label className="cursor-pointer rounded-full bg-emerald-500 px-6 py-3 font-semibold text-slate-900">
-            Choose / take a photo
-            <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFileFallback} />
-          </label>
-          <button onClick={onCancel} className="text-sm text-slate-400 underline">
+        <div className="flex flex-1 flex-col items-center justify-center gap-4 p-6 text-center">
+          <div className="glass-card max-w-xs p-6">
+            <p className="text-body text-text-secondary">
+              {error === 'no-getUserMedia'
+                ? 'Live camera preview is not available in this browser.'
+                : error === 'timeout'
+                  ? 'Camera preview is taking too long to start.'
+                  : 'Camera permission was denied or no camera was found.'}
+            </p>
+          </div>
+          <div className="w-full max-w-xs">
+            <UploadOptions onFile={handleFileFallback} />
+          </div>
+          <button onClick={cancel} className="text-caption text-text-tertiary underline">
             Cancel
           </button>
         </div>
       ) : (
         <>
           <video ref={videoRef} playsInline muted className="h-full w-full flex-1 object-cover" />
-          <div className="absolute inset-x-0 top-0 flex justify-between p-4">
-            <button onClick={onCancel} className="rounded-full bg-black/50 px-4 py-2 text-sm text-white">
+          {/* cinematic vignette so glass controls stay legible over any frame */}
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/70" />
+          {ready && <ViewfinderBrackets />}
+
+          <div className="absolute inset-x-0 top-0 flex items-center justify-between p-4">
+            <button onClick={cancel} className="glass rounded-full px-4 py-2 text-caption text-text-primary">
               Cancel
             </button>
+            <span className="glass rounded-full px-3 py-1 text-caption text-accent-health shadow-[0_0_16px_2px_var(--glow-health)]">
+              Photo mode
+            </span>
           </div>
-          <div className="absolute inset-x-0 bottom-0 flex justify-center pb-10">
-            <button
-              onClick={shoot}
-              disabled={!ready}
-              className={cn(
-                'h-20 w-20 rounded-full border-4 border-white bg-white/20 transition',
-                ready ? 'active:scale-90' : 'opacity-40',
-              )}
-              aria-label="Take photo"
-            />
-          </div>
+
+          {/* Live preview succeeding doesn't mean gallery/files should be
+              unreachable — Deep's explicit ask: camera, gallery, and file
+              upload need to stay real, distinct options at every point in
+              this flow, not just after getUserMedia fails. */}
+          {showUploadOptions ? (
+            <div className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-2 p-6">
+              <div className="w-full max-w-xs">
+                <UploadOptions onFile={handleFileFallback} />
+              </div>
+              <button
+                onClick={() => setShowUploadOptions(false)}
+                className="glass rounded-full px-4 py-1.5 text-caption text-text-secondary"
+              >
+                Back to camera
+              </button>
+            </div>
+          ) : (
+            <div className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-3 pb-10">
+              <button
+                onClick={shoot}
+                disabled={!ready}
+                className={cn(
+                  'h-20 w-20 rounded-full border-4 border-white/90 bg-white/10 backdrop-blur-sm transition',
+                  ready ? 'active:scale-90 shadow-[0_0_32px_6px_var(--glow-health)]' : 'opacity-40',
+                )}
+                aria-label="Take photo"
+              />
+              <button
+                onClick={() => setShowUploadOptions(true)}
+                className="glass rounded-full px-4 py-1.5 text-caption text-text-secondary"
+              >
+                Upload instead
+              </button>
+            </div>
+          )}
         </>
       )}
     </div>

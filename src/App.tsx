@@ -1,19 +1,23 @@
 import { useEffect, useState } from 'react'
-import { CameraCapture } from '@/components/CameraCapture'
+import { CameraCapture, InputOrbButton } from '@/components/CameraCapture'
+import { VoiceCapture } from '@/components/VoiceCapture'
+import { MenuCapture } from '@/components/MenuCapture'
 import { ConfirmLog } from '@/components/ConfirmLog'
 import { TodayRing } from '@/components/TodayRing'
 import { MealTimeline } from '@/components/MealTimeline'
+import { TipsTicker } from '@/components/TipsTicker'
+import { Achievements } from '@/components/Achievements'
+import { TogetherMode } from '@/components/TogetherMode'
 import { identifyFoodViaOllama } from '@/lib/ollamaVision'
 import { resizeImage } from '@/lib/imageResize'
-import { lookupFoodMacros, scaleToPortion } from '@/lib/openFoodFacts'
+import { resolveIdentifiedItems } from '@/lib/resolveFoodItems'
 import { fireConfetti } from '@/lib/confetti'
-import { uid } from '@/lib/utils'
 import { ensureAuthenticated } from '@/lib/auth'
 import { insertMeal, listTodayMeals, subscribeToMeals } from '@/lib/mealsRepo'
 import { sumMacros, DEFAULT_GOALS, type FoodItem, type Meal } from '@/lib/types'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 
-type Stage = 'idle' | 'camera' | 'identifying' | 'confirm' | 'logging'
+type Stage = 'idle' | 'mode-select' | 'camera' | 'voice' | 'menu' | 'identifying' | 'confirm' | 'logging'
 
 /**
  * Core loop, now backed by the real, live Supabase project
@@ -28,6 +32,11 @@ export default function App() {
   const [stage, setStage] = useState<Stage>('idle')
   const [capturedPhoto, setCapturedPhoto] = useState<{ blob: Blob; dataUrl: string } | null>(null)
   const [draftItems, setDraftItems] = useState<FoodItem[]>([])
+  // Menu-mode entries carry these into ConfirmLog as pre-filled defaults (still fully editable
+  // there — see ConfirmLog's own Eating Out toggle, which is available on every path, not just
+  // menu-mode). Reset alongside draftItems/capturedPhoto in every path that leaves 'confirm'.
+  const [draftIsEatingOut, setDraftIsEatingOut] = useState(false)
+  const [draftRestaurantName, setDraftRestaurantName] = useState('')
   const [meals, setMeals] = useState<Meal[]>([])
   const [statusMessage, setStatusMessage] = useState<string | null>(null)
   const [userId, setUserId] = useState<string | null>(null)
@@ -70,6 +79,8 @@ export default function App() {
   async function handleCapture(blob: Blob) {
     const dataUrl = await blobToDataUrl(blob)
     setCapturedPhoto({ blob, dataUrl })
+    setDraftIsEatingOut(false)
+    setDraftRestaurantName('')
     setStage('identifying')
     setStatusMessage(null)
 
@@ -82,26 +93,7 @@ export default function App() {
       const { items, endpointUsed } = await identifyFoodViaOllama(resizedForVision)
       setStatusMessage(`Identified via ${endpointUsed}`)
 
-      const resolved = await Promise.all(
-        items.map(async (item): Promise<FoodItem> => {
-          try {
-            const off = await lookupFoodMacros(item.name)
-            if (!off) {
-              return { id: uid(), name: item.name, estimatedGrams: item.estimatedGrams, calories: 0, proteinG: 0, fatG: 0, carbsG: 0 }
-            }
-            const macros = scaleToPortion(off, item.estimatedGrams)
-            return {
-              id: uid(),
-              name: off.productName || item.name,
-              estimatedGrams: item.estimatedGrams,
-              offCode: off.code,
-              ...macros,
-            }
-          } catch {
-            return { id: uid(), name: item.name, estimatedGrams: item.estimatedGrams, calories: 0, proteinG: 0, fatG: 0, carbsG: 0 }
-          }
-        }),
-      )
+      const resolved = await resolveIdentifiedItems(items)
       setDraftItems(resolved)
       setStage('confirm')
     } catch (err) {
@@ -111,14 +103,52 @@ export default function App() {
     }
   }
 
+  /**
+   * Voice path's final step, run once VoiceCapture has a resolved item list
+   * (either straight from the AI's first pass, or after it asked one or more
+   * clarifying follow-up questions). No photo exists for a voice-logged meal
+   * — capturedPhoto stays null, which ConfirmLog and the logging overlay
+   * both render around rather than require.
+   */
+  function handleVoiceResolved(items: FoodItem[]) {
+    setCapturedPhoto(null)
+    setDraftItems(items)
+    setDraftIsEatingOut(false)
+    setDraftRestaurantName('')
+    setStage('confirm')
+  }
+
+  /**
+   * Menu path's final step (Phase 3, Restaurant/Takeaway Mode), run once MenuCapture has
+   * resolved the user's confirmed dish selection through Open Food Facts. `meta.photo` is
+   * whichever photo MenuCapture decided to keep — the plate photo if the user added one,
+   * otherwise the menu photo itself (see MenuCapture.tsx's own header comment for why this app
+   * keeps exactly one photo per meal rather than two). Eating Out defaults to ON here since the
+   * whole point of this entry point is a restaurant/takeaway meal — still just a default, fully
+   * togglable in ConfirmLog like every other path.
+   */
+  function handleMenuResolved(
+    items: FoodItem[],
+    meta: { restaurantName: string; photo: { blob: Blob; dataUrl: string } | null },
+  ) {
+    setCapturedPhoto(meta.photo)
+    setDraftItems(items)
+    setDraftIsEatingOut(true)
+    setDraftRestaurantName(meta.restaurantName)
+    setStage('confirm')
+  }
+
   async function handleConfirm(draft: Meal) {
-    if (!capturedPhoto || !userId) {
+    if (!userId) {
       setStatusMessage('Not signed in to Supabase yet — cannot log this meal.')
       return
     }
     setStage('logging')
     try {
-      const savedMeal = await insertMeal(userId, capturedPhoto.blob, draft.items)
+      const savedMeal = await insertMeal(userId, capturedPhoto?.blob ?? null, draft.items, {
+        isEatingOut: draft.isEatingOut,
+        restaurantName: draft.restaurantName,
+      })
       setMeals((prev) => (prev.some((m) => m.id === savedMeal.id) ? prev : [...prev, savedMeal]))
       setStatusMessage(null)
       fireConfetti()
@@ -128,56 +158,148 @@ export default function App() {
       setStage('idle')
       setCapturedPhoto(null)
       setDraftItems([])
+      setDraftIsEatingOut(false)
+      setDraftRestaurantName('')
     }
   }
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-md flex-col bg-slate-900 pb-24 text-slate-100">
-      <header className="p-4 text-center">
-        <h1 className="text-lg font-semibold">Today</h1>
-        {authError && <p className="mt-1 text-xs text-red-400">{authError}</p>}
-        {statusMessage && <p className="mt-1 text-xs text-slate-500">{statusMessage}</p>}
+    <div className="relative mx-auto min-h-screen max-w-md overflow-x-hidden bg-bg-primary pb-28 text-text-primary">
+      {/* Ambient background glow — subtle, static (no parallax/particles per Phase 1 scope), sits behind everything. */}
+      <div
+        aria-hidden
+        className="pointer-events-none fixed inset-x-0 top-0 h-80 opacity-30"
+        style={{ background: 'radial-gradient(60% 60% at 50% 0%, var(--glow-ai), transparent 70%)' }}
+      />
+
+      <header className="relative p-4 text-center">
+        <h1 className="text-title">Today</h1>
+        {authError && <p className="mt-1 text-caption text-accent-danger">{authError}</p>}
+        {statusMessage && <p className="mt-1 text-caption text-text-tertiary">{statusMessage}</p>}
       </header>
 
       <TodayRing totals={totals} goals={DEFAULT_GOALS} />
       <MealTimeline meals={meals} />
 
-      <button
-        onClick={() => setStage('camera')}
-        className="fixed bottom-6 left-1/2 h-16 w-16 -translate-x-1/2 rounded-full bg-emerald-500 text-2xl shadow-lg shadow-emerald-500/30"
-        aria-label="Log a meal"
-      >
-        📷
-      </button>
+      {/* Phase 4, Together Mode — tips ticker (real personalized tips when there's enough
+          history, generic fallback tips otherwise), achievements computed from real meal
+          history, and the honestly-labeled social preview. See each component's own header
+          comment for what's real vs. demo. */}
+      <TipsTicker meals={meals} goals={DEFAULT_GOALS} />
+      <Achievements meals={meals} goals={DEFAULT_GOALS} />
+      <TogetherMode meals={meals} goals={DEFAULT_GOALS} />
+
+      <InputOrbButton onClick={() => setStage('mode-select')} />
+
+      {stage === 'mode-select' && (
+        <InputModeSheet
+          onPhoto={() => setStage('camera')}
+          onVoice={() => setStage('voice')}
+          onMenu={() => setStage('menu')}
+          onCancel={() => setStage('idle')}
+        />
+      )}
 
       {stage === 'camera' && <CameraCapture onCapture={handleCapture} onCancel={() => setStage('idle')} />}
 
+      {stage === 'voice' && (
+        <VoiceCapture onResolved={handleVoiceResolved} onCancel={() => setStage('idle')} />
+      )}
+
+      {stage === 'menu' && (
+        <MenuCapture onResolved={handleMenuResolved} onCancel={() => setStage('idle')} />
+      )}
+
       {stage === 'identifying' && capturedPhoto && (
-        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-4 bg-slate-900/95 text-slate-100">
-          <img src={capturedPhoto.dataUrl} alt="" className="h-40 w-40 rounded-2xl object-cover opacity-70" />
-          <p className="animate-pulse text-sm text-slate-400">Identifying food…</p>
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-4 bg-bg-primary/95">
+          <div className="glass-card p-2">
+            <img src={capturedPhoto.dataUrl} alt="" className="h-40 w-40 rounded-md object-cover opacity-80" />
+          </div>
+          <p className="text-body text-accent-ai motion-safe:animate-pulse">Identifying food…</p>
         </div>
       )}
 
-      {stage === 'confirm' && capturedPhoto && (
+      {stage === 'confirm' && (
         <ConfirmLog
-          photoDataUrl={capturedPhoto.dataUrl}
+          photoDataUrl={capturedPhoto?.dataUrl ?? null}
           initialItems={draftItems}
+          pastMeals={meals}
+          initialIsEatingOut={draftIsEatingOut}
+          initialRestaurantName={draftRestaurantName}
           onConfirm={handleConfirm}
           onCancel={() => {
             setStage('idle')
             setCapturedPhoto(null)
             setDraftItems([])
+            setDraftIsEatingOut(false)
+            setDraftRestaurantName('')
           }}
         />
       )}
 
-      {stage === 'logging' && capturedPhoto && (
-        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-4 bg-slate-900/95 text-slate-100">
-          <img src={capturedPhoto.dataUrl} alt="" className="h-40 w-40 rounded-2xl object-cover opacity-70" />
-          <p className="animate-pulse text-sm text-slate-400">Saving to Supabase…</p>
+      {stage === 'logging' && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-4 bg-bg-primary/95">
+          <div className="glass-card p-2">
+            {capturedPhoto ? (
+              <img src={capturedPhoto.dataUrl} alt="" className="h-40 w-40 rounded-md object-cover opacity-80" />
+            ) : (
+              <div className="grid h-40 w-40 place-items-center rounded-md text-4xl" aria-hidden>
+                🎙️
+              </div>
+            )}
+          </div>
+          <p className="text-body text-accent-health motion-safe:animate-pulse">Saving to Supabase…</p>
         </div>
       )}
+    </div>
+  )
+}
+
+/**
+ * Tapping the orb now offers three genuinely distinct entry points instead of
+ * jumping straight to the camera — Photo (existing CameraCapture, itself
+ * still offering live camera + gallery/files), Voice (VoiceCapture), and
+ * Eating Out (MenuCapture, Phase 3 — menu-photo OCR + optional plate photo).
+ * Styled with the same glass button language as CameraCapture's
+ * UploadOptions rather than inventing a new sheet pattern.
+ */
+function InputModeSheet({
+  onPhoto,
+  onVoice,
+  onMenu,
+  onCancel,
+}: {
+  onPhoto: () => void
+  onVoice: () => void
+  onMenu: () => void
+  onCancel: () => void
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col items-center justify-end bg-black/60 p-6 pb-10">
+      <div className="glass-card flex w-full max-w-xs flex-col gap-2 p-4">
+        <p className="mb-1 text-center text-caption uppercase tracking-wide text-text-tertiary">Log a meal</p>
+        <button
+          onClick={onPhoto}
+          className="glass flex items-center justify-center gap-2 rounded-full px-6 py-3 text-subtitle font-semibold text-accent-health shadow-[0_0_24px_4px_var(--glow-health)] transition active:scale-95"
+        >
+          <span aria-hidden>📷</span> Photo
+        </button>
+        <button
+          onClick={onVoice}
+          className="glass flex items-center justify-center gap-2 rounded-full px-6 py-3 text-subtitle font-semibold text-accent-ai shadow-[0_0_24px_4px_var(--glow-ai)] transition active:scale-95"
+        >
+          <span aria-hidden>🎙️</span> Voice
+        </button>
+        <button
+          onClick={onMenu}
+          className="glass flex items-center justify-center gap-2 rounded-full px-6 py-3 text-subtitle font-semibold text-accent-energy shadow-[0_0_24px_4px_var(--glow-energy)] transition active:scale-95"
+        >
+          <span aria-hidden>🍽️</span> Eating Out
+        </button>
+        <button onClick={onCancel} className="mt-1 text-caption text-text-tertiary underline">
+          Cancel
+        </button>
+      </div>
     </div>
   )
 }

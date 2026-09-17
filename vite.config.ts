@@ -16,11 +16,11 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg'],
       manifest: {
-        name: 'Calorie Tracker',
-        short_name: 'Calorie',
-        description: 'Snap a photo, log your meal, watch the ring fill.',
-        theme_color: '#0f172a',
-        background_color: '#0f172a',
+        name: 'NUTRIOS',
+        short_name: 'NUTRIOS',
+        description: 'Snap a photo. NUTRIOS reads your meal and fills the ring instantly.',
+        theme_color: '#0A0A0F',
+        background_color: '#0A0A0F',
         display: 'standalone',
         start_url: '/',
         icons: [

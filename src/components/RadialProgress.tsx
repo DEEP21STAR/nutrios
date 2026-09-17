@@ -3,13 +3,11 @@ import gsap from 'gsap'
 import { cn, prefersReducedMotion } from '@/lib/utils'
 
 /**
- * Coordinator follow-up — real circular/radial progress rings (not just the existing linear
- * bars), genuine eye candy: real SVG arc (stroke-dasharray/dashoffset), animated with GSAP —
- * fills from empty on first mount, and on every SUBSEQUENT re-render (a live payment landing)
- * eases smoothly from its CURRENT position to the new one rather than snapping — same pattern
- * PeriodicBillGauge.tsx already established for its own ring, generalised here so every ring
- * in the app (installment plans, device repayments, min-payment, the aggregate debt-payoff
- * ring) shares one real, tested implementation instead of four near-duplicates.
+ * NUTRIOS "Fluid Ring" — real SVG arc (stroke-dasharray/dashoffset), GSAP
+ * elastic fill animation on first mount, smooth ease on subsequent updates.
+ * Glow colour is fully caller-driven (see TodayRing's amber/crimson
+ * threshold logic) so this component stays a generic, reusable ring rather
+ * than owning the app's specific low-remaining rule.
  */
 export function RadialProgress({
   percent,
@@ -18,6 +16,7 @@ export function RadialProgress({
   strokeWidth = 8,
   centerLabel,
   className,
+  glow = true,
 }: {
   /** 0-100. Values outside that range are clamped — a ring never overflows past a full circle or reverses. */
   percent: number
@@ -27,6 +26,8 @@ export function RadialProgress({
   strokeWidth?: number
   centerLabel?: ReactNode
   className?: string
+  /** Luminous drop-shadow glow matching `color` — on by default per the Cinematic Tech spec, but the nested macro rings turn it off so the calorie ring's glow stays the visual lead. */
+  glow?: boolean
 }) {
   const clamped = Math.max(0, Math.min(100, percent))
   const radius = (size - strokeWidth) / 2
@@ -45,12 +46,20 @@ export function RadialProgress({
       return
     }
     if (!hasMounted.current) {
-      // First paint: fill from genuinely empty, not just appear at the final value.
-      gsap.fromTo(el, { strokeDashoffset: circumference }, { strokeDashoffset: dashOffset, duration: 1.1, ease: 'power2.out' })
+      // First paint: fill from genuinely empty with an elastic spring —
+      // amplitude kept low (1) so it reads as a confident "settle into
+      // place" rather than a bouncy toy; a full circumference sweep is
+      // already a big, showy motion on its own.
+      gsap.fromTo(
+        el,
+        { strokeDashoffset: circumference },
+        { strokeDashoffset: dashOffset, duration: 1.4, ease: 'elastic.out(1, 0.5)' },
+      )
       hasMounted.current = true
     } else {
-      // A real update (e.g. a payment landing) — eases from wherever the ring currently sits,
-      // not a fresh fromTo, so it visibly GROWS rather than resetting and refilling.
+      // A real update (a meal just logged) — eases from wherever the ring
+      // currently sits, not a fresh fromTo, so it visibly GROWS rather than
+      // resetting and refilling.
       gsap.to(el, { strokeDashoffset: dashOffset, duration: 0.9, ease: 'power2.out' })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -58,7 +67,7 @@ export function RadialProgress({
 
   return (
     <div className={cn('relative shrink-0', className)} style={{ width: size, height: size }}>
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90">
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="-rotate-90 overflow-visible">
         <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth={strokeWidth} />
         <circle
           ref={ringRef}
@@ -71,6 +80,7 @@ export function RadialProgress({
           strokeLinecap="round"
           strokeDasharray={circumference}
           strokeDashoffset={circumference}
+          style={glow ? { filter: `drop-shadow(0 0 6px ${color}) drop-shadow(0 0 14px ${color})`, transition: 'stroke 0.6s ease' } : { transition: 'stroke 0.6s ease' }}
         />
       </svg>
       {centerLabel && <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-1">{centerLabel}</div>}

@@ -18,6 +18,10 @@ interface MealRow {
   total_fat_g: number
   total_carbs_g: number
   logged_at: string
+  // Optional: only present once supabase/migrations/0002_eating_out.sql has actually been run —
+  // see insertMeal's fallback below for what happens before that.
+  is_eating_out?: boolean
+  restaurant_name?: string | null
 }
 
 function rowToMeal(row: MealRow): Meal {
@@ -26,30 +30,75 @@ function rowToMeal(row: MealRow): Meal {
     photoDataUrl: row.photo_url ?? '',
     items: row.items,
     loggedAt: row.logged_at,
+    isEatingOut: row.is_eating_out ?? undefined,
+    restaurantName: row.restaurant_name ?? undefined,
   }
 }
 
-/** Uploads the photo, then inserts the meal row. Returns the real, DB-assigned Meal. */
-export async function insertMeal(userId: string, photoBlob: Blob, items: FoodItem[]): Promise<Meal> {
-  const photoUrl = await uploadMealPhoto(photoBlob, userId)
+/**
+ * Uploads the photo (when there is one), then inserts the meal row. Returns
+ * the real, DB-assigned Meal. `photoBlob` is null for a voice-logged meal —
+ * the `meals` table's `photo_url` column already allows null (see
+ * supabase/migrations/0001_init.sql), so this just skips the Storage upload
+ * entirely rather than inventing a placeholder image.
+ *
+ * `isEatingOut`/`restaurantName` (Phase 3, 2026-09-16) need the two new columns from
+ * supabase/migrations/0002_eating_out.sql, which — like 0001 before it — requires a one-time
+ * manual run in the Supabase SQL Editor (no DDL access from this app's anon key). Rather than
+ * make every meal log fail until that's done, this tries the full insert first and, ONLY on
+ * PostgREST's specific "column not found in schema cache" error (code PGRST204, or the matching
+ * message text as a fallback check), retries without the two new fields. Any other error still
+ * throws normally. The caller (App.tsx) gets a real Meal back either way; it just won't have
+ * survived to the DB with the eating-out tag until the migration is applied.
+ */
+export async function insertMeal(
+  userId: string,
+  photoBlob: Blob | null,
+  items: FoodItem[],
+  meta?: { isEatingOut?: boolean; restaurantName?: string },
+): Promise<Meal> {
+  const photoUrl = photoBlob ? await uploadMealPhoto(photoBlob, userId) : null
   const totals = sumMacros(items)
 
-  const { data, error } = await supabase
+  const basePayload = {
+    user_id: userId,
+    photo_url: photoUrl,
+    items,
+    total_calories: totals.calories,
+    total_protein_g: totals.proteinG,
+    total_fat_g: totals.fatG,
+    total_carbs_g: totals.carbsG,
+  }
+  const eatingOutFields = meta?.isEatingOut
+    ? { is_eating_out: true, restaurant_name: meta.restaurantName?.trim() || null }
+    : {}
+
+  let { data, error } = await supabase
     .from('meals')
-    .insert({
-      user_id: userId,
-      photo_url: photoUrl,
-      items,
-      total_calories: totals.calories,
-      total_protein_g: totals.proteinG,
-      total_fat_g: totals.fatG,
-      total_carbs_g: totals.carbsG,
-    })
+    .insert({ ...basePayload, ...eatingOutFields })
     .select()
     .single<MealRow>()
 
+  if (error && Object.keys(eatingOutFields).length > 0 && isMissingColumnError(error)) {
+    console.warn(
+      '[mealsRepo] is_eating_out/restaurant_name column(s) not found — run supabase/migrations/0002_eating_out.sql. ' +
+        'Retrying this insert without them (meal will still save, just without the eating-out tag persisted).',
+    )
+    ;({ data, error } = await supabase.from('meals').insert(basePayload).select().single<MealRow>())
+    if (!error && data) {
+      // Column doesn't exist server-side yet, but the caller still asked for the tag — keep it
+      // in the returned in-memory Meal so the current session's UI (ConfirmLog/MealTimeline)
+      // shows it correctly even though it won't survive a reload until the migration runs.
+      return { ...rowToMeal(data), isEatingOut: meta?.isEatingOut, restaurantName: meta?.restaurantName }
+    }
+  }
+
   if (error || !data) throw new Error(`Failed to log meal: ${error?.message ?? 'no row returned'}`)
   return rowToMeal(data)
+}
+
+function isMissingColumnError(error: { code?: string; message?: string }): boolean {
+  return error.code === 'PGRST204' || /column .* (does not exist|not found)/i.test(error.message ?? '')
 }
 
 /** All of today's meals for this user, newest first is handled by the caller/UI. */
