@@ -6,6 +6,9 @@
  * 100g, which we then scale by the vision model's estimated portion size.
  */
 
+import { matchCommonFood } from '@/lib/commonFoods'
+import { getCachedFoodLookup, cacheFoodLookup } from '@/lib/offlineFoodCache'
+
 export interface OffMacros {
   code: string
   productName: string
@@ -36,8 +39,31 @@ interface OffSearchResponse {
  * "Page temporarily unavailable" for one request, which had fully recovered
  * 3 seconds later on a plain retry. Without this, that single hiccup would
  * silently zero out an item's macros in the confirm screen.
+ *
+ * 2026-09-18: checks two things BEFORE ever touching the network, in order —
+ *   1. commonFoods.ts's curated whole-foods dataset — fixes both the offline case AND this
+ *      file's own documented weak spot (OFF being a branded-product database, not a whole-food
+ *      one; "olives" matching olive oil, "banana" resolving to zero, both real, both here).
+ *   2. offlineFoodCache.ts — anything looked up successfully before, cached, works offline.
+ * A cache miss + no common-food match still falls through to the real network call exactly as
+ * before, and a successful network result gets cached for next time.
  */
 export async function lookupFoodMacros(query: string): Promise<OffMacros | null> {
+  const common = matchCommonFood(query)
+  if (common) {
+    return {
+      code: '',
+      productName: common.name,
+      caloriesPer100g: common.caloriesPer100g,
+      proteinPer100gG: common.proteinPer100gG,
+      fatPer100gG: common.fatPer100gG,
+      carbsPer100gG: common.carbsPer100gG,
+    }
+  }
+
+  const cached = getCachedFoodLookup(query)
+  if (cached) return cached
+
   const url = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(
     query,
   )}&search_simple=1&action=process&json=1&page_size=5&fields=code,product_name,product_name_en,nutriments`
@@ -81,7 +107,7 @@ export async function lookupFoodMacros(query: string): Promise<OffMacros | null>
 
   const best = nameMatch ?? candidates[0]
   const n = best.nutriments!
-  return {
+  const result: OffMacros = {
     code: best.code ?? '',
     productName: best.product_name_en || best.product_name || query,
     caloriesPer100g: n['energy-kcal_100g'] ?? 0,
@@ -89,6 +115,8 @@ export async function lookupFoodMacros(query: string): Promise<OffMacros | null>
     fatPer100gG: n['fat_100g'] ?? 0,
     carbsPer100gG: n['carbohydrates_100g'] ?? 0,
   }
+  cacheFoodLookup(query, result)
+  return result
 }
 
 /** Scales a per-100g macro profile to an estimated portion size in grams. */

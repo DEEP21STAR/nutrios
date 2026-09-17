@@ -119,6 +119,27 @@ export async function listTodayMeals(userId: string): Promise<Meal[]> {
 }
 
 /**
+ * Real historical range, oldest first (Phase 5, Trends & History, 2026-09-17) — same table, same
+ * RLS-scoped query shape as listTodayMeals above, just parameterized by a real start date instead
+ * of "today" so TrendsHistory.tsx's weekly calorie bar chart can aggregate real multi-day data.
+ * Deliberately a separate function/query rather than widening listTodayMeals's range: the Today
+ * screen's own consumers (TodayRing, MealTimeline, Achievements, TogetherMode) all intentionally
+ * see only today's meals, and this keeps that behaviour untouched.
+ */
+export async function listMealsSince(userId: string, sinceISO: string): Promise<Meal[]> {
+  const { data, error } = await supabase
+    .from('meals')
+    .select('*')
+    .eq('user_id', userId)
+    .gte('logged_at', sinceISO)
+    .order('logged_at', { ascending: true })
+    .returns<MealRow[]>()
+
+  if (error) throw new Error(`Failed to load meal history: ${error.message}`)
+  return (data ?? []).map(rowToMeal)
+}
+
+/**
  * Realtime subscription for cross-device live sync (spec requirement): any
  * insert to this user's own meals (RLS still applies — a client only ever
  * receives rows it's allowed to select) triggers `onInsert` with the new row.

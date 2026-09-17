@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Supabase CLI local metadata (project ref, pooler URL, versions — not secrets, but local-only)
+supabase/.temp

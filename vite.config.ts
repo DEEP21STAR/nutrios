@@ -9,6 +9,10 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 // https://vite.dev/config/
 export default defineConfig({
+  // Served as a GitHub Pages project site at deep21star.github.io/nutrios/,
+  // not the domain root — every asset/manifest path needs this prefix or
+  // the built JS/CSS 404s in production.
+  base: '/nutrios/',
   plugins: [
     react(),
     tailwindcss(),
@@ -22,7 +26,8 @@ export default defineConfig({
         theme_color: '#0A0A0F',
         background_color: '#0A0A0F',
         display: 'standalone',
-        start_url: '/',
+        start_url: '/nutrios/',
+        scope: '/nutrios/',
         icons: [
           { src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png' },
           { src: 'pwa-512x512.png', sizes: '512x512', type: 'image/png' },

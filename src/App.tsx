@@ -4,11 +4,16 @@ import { VoiceCapture } from '@/components/VoiceCapture'
 import { MenuCapture } from '@/components/MenuCapture'
 import { ConfirmLog } from '@/components/ConfirmLog'
 import { TodayRing } from '@/components/TodayRing'
+import { HealthyScoreGauge } from '@/components/HealthyScoreGauge'
 import { MealTimeline } from '@/components/MealTimeline'
 import { TipsTicker } from '@/components/TipsTicker'
 import { Achievements } from '@/components/Achievements'
 import { TogetherMode } from '@/components/TogetherMode'
+import { TrendsHistory } from '@/components/TrendsHistory'
+import { TabBar, type TabKey } from '@/components/TabBar'
 import { identifyFoodViaOllama } from '@/lib/ollamaVision'
+import { identifyFoodViaGemini } from '@/lib/geminiVision'
+import { identifyFoodOnDevice, isWebGPUAvailable, type OnDeviceProgress } from '@/lib/onDeviceVision'
 import { resizeImage } from '@/lib/imageResize'
 import { resolveIdentifiedItems } from '@/lib/resolveFoodItems'
 import { fireConfetti } from '@/lib/confetti'
@@ -29,6 +34,11 @@ type Stage = 'idle' | 'mode-select' | 'camera' | 'voice' | 'menu' | 'identifying
  * built — this round only replaced the mock data layer with real calls.
  */
 export default function App() {
+  const [activeTab, setActiveTab] = useState<TabKey>('today')
+  // On-device fallback progress (model download %, "running on-device", etc.) — shown on the
+  // identifying overlay only while that path is actually in use, so the common Ollama-reachable
+  // case never sees an unnecessary extra line.
+  const [identifyingDetail, setIdentifyingDetail] = useState<string | null>(null)
   const [stage, setStage] = useState<Stage>('idle')
   const [capturedPhoto, setCapturedPhoto] = useState<{ blob: Blob; dataUrl: string } | null>(null)
   const [draftItems, setDraftItems] = useState<FoodItem[]>([])
@@ -83,23 +93,73 @@ export default function App() {
     setDraftRestaurantName('')
     setStage('identifying')
     setStatusMessage(null)
+    setIdentifyingDetail(null)
+
+    // Resize before sending to the vision model — confirmed live during
+    // core-loop testing that this cuts inference time ~5.7x on this
+    // hardware, and an unresized photo has previously blown the model's
+    // context window entirely. Shared by both the Ollama and on-device paths.
+    const resizedForVision = await resizeImage(blob, 640)
+
+    // Three real vision paths, tried in order — each with a genuinely different failure mode,
+    // so none of them can substitute for the others:
+    //   1. Ollama (home/Tailscale) — best quality, needs the laptop on and reachable.
+    //   2. Gemini via the identify-food Edge Function — the shared-family path (2026-09-17):
+    //      one Gemini key held server-side, invisible to every device, needs only internet
+    //      (wifi or mobile data), no per-device capability required.
+    //   3. On-device WebGPU — free forever, fully offline once cached, but real hardware/browser
+    //      support varies (confirmed absent on Deep's own phone) — last resort, not first.
+    const failures: string[] = []
 
     try {
-      // Resize before sending to the vision model — confirmed live during
-      // core-loop testing that this cuts inference time ~5.7x on this
-      // hardware, and an unresized photo has previously blown the model's
-      // context window entirely.
-      const resizedForVision = await resizeImage(blob, 640)
       const { items, endpointUsed } = await identifyFoodViaOllama(resizedForVision)
       setStatusMessage(`Identified via ${endpointUsed}`)
-
-      const resolved = await resolveIdentifiedItems(items)
-      setDraftItems(resolved)
+      setDraftItems(await resolveIdentifiedItems(items))
       setStage('confirm')
-    } catch (err) {
-      setStatusMessage(err instanceof Error ? err.message : 'Vision identification failed.')
+      return
+    } catch (ollamaErr) {
+      failures.push(`Ollama: ${ollamaErr instanceof Error ? ollamaErr.message : 'failed'}`)
+    }
+
+    try {
+      setIdentifyingDetail('Trying shared vision service…')
+      const items = await identifyFoodViaGemini(resizedForVision)
+      setStatusMessage('Identified via shared vision service')
+      setDraftItems(await resolveIdentifiedItems(items))
+      setStage('confirm')
+      return
+    } catch (geminiErr) {
+      failures.push(`Shared vision service: ${geminiErr instanceof Error ? geminiErr.message : 'failed'}`)
+    }
+
+    if (!isWebGPUAvailable()) {
+      // Distinct from a plain failure — explicitly says the on-device attempt was never made,
+      // not that it was tried and failed, so this doesn't get misread as a bug in that path.
+      setStatusMessage(`${failures.join(' | ')} | On-device: skipped — this browser has no WebGPU.`)
+      setDraftItems([])
+      setStage('confirm')
+      return
+    }
+
+    try {
+      setIdentifyingDetail('Starting on-device model (first time: one download, then instant)…')
+      const items = await identifyFoodOnDevice(resizedForVision, (p: OnDeviceProgress) => {
+        if (p.status === 'progress' && typeof p.progress === 'number') {
+          setIdentifyingDetail(`Downloading on-device model… ${Math.round(p.progress)}%`)
+        } else if (p.status === 'ready' || p.status === 'done') {
+          setIdentifyingDetail('Running on-device…')
+        }
+      })
+      setStatusMessage('Identified on-device (offline)')
+      setDraftItems(await resolveIdentifiedItems(items))
+      setStage('confirm')
+    } catch (onDeviceErr) {
+      failures.push(`On-device: ${onDeviceErr instanceof Error ? onDeviceErr.message : 'failed'}`)
+      setStatusMessage(failures.join(' | '))
       setDraftItems([])
       setStage('confirm') // still let the user log manually — manual-entry fallback
+    } finally {
+      setIdentifyingDetail(null)
     }
   }
 
@@ -164,8 +224,9 @@ export default function App() {
   }
 
   return (
-    <div className="relative mx-auto min-h-screen max-w-md overflow-x-hidden bg-bg-primary pb-28 text-text-primary">
-      {/* Ambient background glow — subtle, static (no parallax/particles per Phase 1 scope), sits behind everything. */}
+    <div className="relative z-10 mx-auto min-h-screen max-w-md overflow-x-hidden pb-40 text-text-primary">
+      {/* Ambient background glow — subtle, static, sits behind everything. Starfield canvas
+          (index.html) now shows through here — Phase 1's "no particles" scope was revised. */}
       <div
         aria-hidden
         className="pointer-events-none fixed inset-x-0 top-0 h-80 opacity-30"
@@ -173,23 +234,43 @@ export default function App() {
       />
 
       <header className="relative p-4 text-center">
-        <h1 className="text-title">Today</h1>
+        <h1 className="text-title">
+          {activeTab === 'today' ? 'Today' : activeTab === 'progress' ? 'Progress' : 'Together'}
+        </h1>
         {authError && <p className="mt-1 text-caption text-accent-danger">{authError}</p>}
         {statusMessage && <p className="mt-1 text-caption text-text-tertiary">{statusMessage}</p>}
       </header>
 
-      <TodayRing totals={totals} goals={DEFAULT_GOALS} />
-      <MealTimeline meals={meals} />
+      {/* Tabbed layout (2026-09-17) — was one continuous scroll through every section
+          regardless of what the user actually came here to do. Each tab below is exactly the
+          same components/props as before, just gated by activeTab instead of always-rendered,
+          so none of them had to change their own data-fetching logic. */}
+      {activeTab === 'today' && (
+        <>
+          <TodayRing totals={totals} goals={DEFAULT_GOALS} />
+          {/* Phase 5, Healthy Score — added alongside TodayRing, not replacing any part of it
+              (see HealthyScoreGauge.tsx's own header comment for why). */}
+          <HealthyScoreGauge totals={totals} goals={DEFAULT_GOALS} todaysMeals={meals} />
+          <MealTimeline meals={meals} />
+          <TipsTicker meals={meals} goals={DEFAULT_GOALS} />
+        </>
+      )}
 
-      {/* Phase 4, Together Mode — tips ticker (real personalized tips when there's enough
-          history, generic fallback tips otherwise), achievements computed from real meal
-          history, and the honestly-labeled social preview. See each component's own header
-          comment for what's real vs. demo. */}
-      <TipsTicker meals={meals} goals={DEFAULT_GOALS} />
-      <Achievements meals={meals} goals={DEFAULT_GOALS} />
-      <TogetherMode meals={meals} goals={DEFAULT_GOALS} />
+      {activeTab === 'progress' && (
+        <>
+          {/* Phase 4 — achievements computed from real meal history, see the component's own
+              header comment for what's real vs. demo. */}
+          <Achievements meals={meals} goals={DEFAULT_GOALS} />
+          {/* Phase 5, Trends & History — real weekly calorie bar chart + weight trend (or its
+              honest empty state). */}
+          <TrendsHistory userId={userId} goals={DEFAULT_GOALS} />
+        </>
+      )}
+
+      {activeTab === 'together' && <TogetherMode meals={meals} goals={DEFAULT_GOALS} />}
 
       <InputOrbButton onClick={() => setStage('mode-select')} />
+      <TabBar active={activeTab} onChange={setActiveTab} />
 
       {stage === 'mode-select' && (
         <InputModeSheet
@@ -216,6 +297,7 @@ export default function App() {
             <img src={capturedPhoto.dataUrl} alt="" className="h-40 w-40 rounded-md object-cover opacity-80" />
           </div>
           <p className="text-body text-accent-ai motion-safe:animate-pulse">Identifying food…</p>
+          {identifyingDetail && <p className="text-caption text-text-tertiary">{identifyingDetail}</p>}
         </div>
       )}
 
@@ -226,6 +308,9 @@ export default function App() {
           pastMeals={meals}
           initialIsEatingOut={draftIsEatingOut}
           initialRestaurantName={draftRestaurantName}
+          todaysTotals={totals}
+          goals={DEFAULT_GOALS}
+          identificationNote={statusMessage}
           onConfirm={handleConfirm}
           onCancel={() => {
             setStage('idle')

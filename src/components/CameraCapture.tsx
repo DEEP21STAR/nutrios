@@ -25,7 +25,7 @@ export function InputOrbButton({ onClick }: { onClick: () => void }) {
   }, [])
 
   return (
-    <div className="fixed bottom-6 left-1/2 z-40 -translate-x-1/2">
+    <div className="fixed bottom-24 left-1/2 z-40 -translate-x-1/2">
       <div
         ref={glowRef}
         aria-hidden

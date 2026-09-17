@@ -8,6 +8,29 @@
  * If neither responds, callers fall back to the on-device WebGPU model
  * (lib/onDeviceVision.ts).
  *
+ * BOUNDING-BOX OVERLAY — REAL FEASIBILITY TEST RESULT (Phase 5, 2026-09-17): the brief asked for
+ * a MyFitnessPal-style labeled box drawn on the photo per detected item, but ONLY if qwen2.5vl:3b
+ * actually returns usable grounded coordinates through this Ollama setup. Tested for real against
+ * the live localhost:11434 endpoint with a real downloaded multi-item food photo (three plates +
+ * garnishes), three separate prompt attempts:
+ *   1. JSON-schema-forced prompt asking for a 0-1000 normalized box per item -> model returned
+ *      `{"items":[]}` every time (2 runs), generating only 5 tokens — it recognized the shape but
+ *      declined to fill it in rather than guess.
+ *   2. Freeform prompt asking for pixel-coordinate boxes, one line per item -> returned a single
+ *      vague box labeled generically "food item", not per-item.
+ *   3. Freeform prompt naming the actual items in the photo (steak/cashews/chili/lettuce) and
+ *      asking for a pixel box each -> DID return per-item boxes, but they are not real: for a
+ *      640x427px image it returned x-coordinates over 1000 and near-duplicate boxes repeated
+ *      6-11 times per item (a degenerate loop, same failure family as the original repetition bug
+ *      this file's PROMPT/GENERATION_OPTIONS comment above already documents) — i.e. plausible-
+ *      looking numbers that are not grounded to the actual photo.
+ * Conclusion: this model, at this size, through this Ollama GGUF build, does not return real
+ * bounding-box coordinates — it either refuses or hallucinates them. Per the task's explicit
+ * instruction not to fabricate fake box positions to make a UI look done, NO bounding-box overlay
+ * was built this phase (not even the "tap to highlight roughly" fallback the brief allowed —
+ * decided that even a rough highlight risks reading as "the AI found this", which it didn't).
+ * Skipping is the honest call here, flagged explicitly in the phase handback.
+ *
  * NOTE on Tailscale: `tailscaled` was found installed but NOT RUNNING on this
  * dev machine, and starting it requires an interactive sudo password this
  * session doesn't have. So candidate #1 will fail here until Deep starts it

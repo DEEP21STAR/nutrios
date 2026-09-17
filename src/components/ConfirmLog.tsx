@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react'
-import type { FoodItem } from '@/lib/types'
+import type { FoodItem, Goals, MacroTotals } from '@/lib/types'
 import { sumMacros, type Meal } from '@/lib/types'
 import { cn, uid } from '@/lib/utils'
 import { MACRO_COLORS } from '@/components/TodayRing'
+import { GoalImpact } from '@/components/GoalImpact'
 import { applyEatingOutAdjustment, findRepeatVisitSuggestion } from '@/lib/eatingOutAdjustment'
 
 /** Real device haptic tick on slider drag, when the API exists — degrades to nothing (no error, no fake motion) everywhere else. Not gated by prefers-reduced-motion: this is tactile, not visual/animated. */
@@ -36,6 +37,9 @@ export function ConfirmLog({
   pastMeals = [],
   initialIsEatingOut = false,
   initialRestaurantName = '',
+  todaysTotals,
+  goals,
+  identificationNote = null,
   onConfirm,
   onCancel,
 }: {
@@ -51,6 +55,16 @@ export function ConfirmLog({
    * item 3 — "Eating Out" must be settable on ANY entry, not just menu-mode ones). */
   initialIsEatingOut?: boolean
   initialRestaurantName?: string
+  /** Today's totals from meals already logged, BEFORE this one — feeds the Goal Impact panel's
+   * "projected end-of-day" math. Not optional: every real call site has this via App.tsx's
+   * existing `totals` (sumMacros over already-logged meals), computed well before ConfirmLog
+   * ever mounts. */
+  todaysTotals: MacroTotals
+  goals: Goals
+  /** Real reason identification succeeded/failed (which endpoint, or the specific error) —
+   * previously only shown on App.tsx's own header, which this full-screen overlay immediately
+   * covers, so it was never actually visible to anyone. Surfaced here instead. */
+  identificationNote?: string | null
   onConfirm: (meal: Meal) => void
   onCancel: () => void
 }) {
@@ -119,7 +133,15 @@ export function ConfirmLog({
 
       <div className="relative mx-4 mt-4">
         {photoDataUrl ? (
-          <img src={photoDataUrl} alt="Captured meal" className="h-48 w-full rounded-lg object-cover" />
+          // Full photo, not cropped — was h-48 + object-cover, which forced every photo into a
+          // fixed landscape-ish box and cut off whatever didn't fit (real bug: a portrait phone
+          // photo lost its top/bottom). object-contain + a real background fills the letterbox
+          // space instead of cropping content away.
+          <img
+            src={photoDataUrl}
+            alt="Captured meal"
+            className="max-h-[420px] w-full rounded-lg bg-bg-tertiary object-contain"
+          />
         ) : (
           // Voice-logged meal — no photo exists. Same violet AI glow language
           // as the Input Orb's voice option, not a blank/broken-image look.
@@ -210,7 +232,12 @@ export function ConfirmLog({
 
       <div className="mt-4 flex flex-col gap-3 px-4">
         {items.length === 0 && (
-          <p className="text-center text-body text-text-tertiary">No items identified — add one manually below.</p>
+          <div className="flex flex-col gap-1.5 text-center">
+            <p className="text-body text-text-tertiary">No items identified — add one manually below.</p>
+            {identificationNote && (
+              <p className="text-caption text-accent-danger/90">{identificationNote}</p>
+            )}
+          </div>
         )}
         {items.map((item) => (
           <div key={item.id} className="glass-card p-4">
@@ -286,6 +313,8 @@ export function ConfirmLog({
           + Add item manually
         </button>
       </div>
+
+      <GoalImpact todaysTotals={todaysTotals} mealTotals={totals} goals={goals} />
 
       <div className="glass sticky bottom-0 mt-auto p-4">
         <div className="mb-3 flex items-center justify-between">

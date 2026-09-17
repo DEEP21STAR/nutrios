@@ -11,7 +11,7 @@ export const MACRO_COLORS = { protein: '#f472b6', fat: '#fbbf24', carbs: '#60a5f
  * under 10% left or already over. Otherwise the ring stays Luminous
  * Emerald, the spec's health/success colour.
  */
-function ringColorForRemaining(remainingPct: number): string {
+export function ringColorForRemaining(remainingPct: number): string {
   if (remainingPct <= 10) return 'var(--color-accent-danger)'
   if (remainingPct <= 25) return 'var(--color-accent-energy)'
   return 'var(--color-accent-health)'

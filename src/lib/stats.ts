@@ -1,4 +1,4 @@
-import type { Goals, Meal } from '@/lib/types'
+import type { Goals, MacroTotals, Meal } from '@/lib/types'
 import { sumMacros } from '@/lib/types'
 
 /**
@@ -157,6 +157,103 @@ export function firstEatingOutMeal(meals: Meal[]): Meal | null {
     .filter((m) => m.isEatingOut)
     .sort((a, b) => a.loggedAt.localeCompare(b.loggedAt))
   return sorted[0] ?? null
+}
+
+/** One calendar day's real total vs. the user's real daily calorie target — chart-ready shape for
+ * the weekly bar chart in TrendsHistory.tsx (Phase 5, 2026-09-17). */
+export interface DayVsGoal {
+  date: string // yyyy-mm-dd, local calendar day
+  /** Short axis label, e.g. "Mon" — today gets "Today" instead so it's easy to find at a glance. */
+  dayLabel: string
+  calories: number
+  goal: number
+  /** True if nothing was logged this day at all — distinct from "logged 0 kcal", which can't
+   * actually happen, but keeps the bar chart from silently treating "no data" and "a real zero"
+   * as the same thing if that ever changes. */
+  hasData: boolean
+}
+
+/**
+ * Real per-day calorie totals for the last `days` calendar days (inclusive of today), oldest
+ * first — exactly the shape Lose It's "My Analysis: on target" bar chart was the reference for.
+ * Every value comes from groupMealsByDay's real aggregation over the real `meals` the caller
+ * fetched (see mealsRepo.listMealsSince) — days with nothing logged still get an entry (calories:
+ * 0, hasData: false) so the chart shows a real gap instead of silently compressing the x-axis.
+ */
+export function lastNDaysCalorieTotals(meals: Meal[], goals: Goals, days = 7, now = new Date()): DayVsGoal[] {
+  const byDay = groupMealsByDay(meals)
+  const cursor = new Date(now)
+  cursor.setHours(0, 0, 0, 0)
+  const out: DayVsGoal[] = []
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(cursor)
+    d.setDate(d.getDate() - i)
+    const key = localDateKey(d.toISOString())
+    const day = byDay.get(key)
+    out.push({
+      date: key,
+      dayLabel: i === 0 ? 'Today' : d.toLocaleDateString('en-NZ', { weekday: 'short' }),
+      calories: day?.calories ?? 0,
+      goal: goals.calorieGoal,
+      hasData: !!day && day.mealCount > 0,
+    })
+  }
+  return out
+}
+
+/**
+ * "Healthy Score" (Phase 5, 2026-09-17) — a single 0-100 composite, Deep's own design decision
+ * per the task brief (only the CONCEPT of one score was approved, not exact weights — flagged
+ * explicitly in the handback too). Modeled loosely on Hoot's 1-100 Nutrition Score. Three parts,
+ * each documented so the number is legible rather than a black box:
+ *
+ * 1. Calorie adherence (0-40): how close today's total is to the calorie goal, symmetric in
+ *    either direction (being 20% under is scored the same as being 20% over) — full marks at
+ *    exactly the goal, straight-line falloff to 0 at +/-67% away from it (a deviation that large
+ *    means the day's logging is either very off-target or very incomplete, either way not worth
+ *    partial credit).
+ * 2. Macro balance (0-30): average, across protein/fat/carbs, of how close each macro's intake is
+ *    to ITS OWN goal — under the goal scores linearly (half the protein goal = half credit), over
+ *    the goal falls back off at the same rate (does not reward "as much as possible", matches the
+ *    calorie score's own over-shooting-isn't-free logic).
+ * 3. Variety (0-30): distinct food names logged today, out of a 5-item/day reference point, capped
+ *    at full marks — reuses uniqueFoodNames so "variety" always means real distinct logged items,
+ *    never a fabricated count.
+ *
+ * Deliberately NOT a weighted average of raw percentages — the asymmetric floor for going way over
+ * on any axis is intentional, matching this app's existing "going over ranks worse" judgment call
+ * already made in goalCrusherWeekScore above.
+ */
+export interface HealthyScoreBreakdown {
+  score: number // 0-100, rounded
+  calorieScore: number // 0-40
+  macroScore: number // 0-30
+  varietyScore: number // 0-30
+}
+
+const VARIETY_REFERENCE_COUNT = 5
+
+function symmetricAdherence(actual: number, goal: number, falloffAt: number): number {
+  if (goal <= 0) return 0
+  const deviationPct = Math.abs(actual - goal) / goal
+  return Math.max(0, 1 - deviationPct / falloffAt)
+}
+
+export function computeHealthyScore(totals: MacroTotals, goals: Goals, todaysMeals: Meal[]): HealthyScoreBreakdown {
+  const calorieScore = 40 * symmetricAdherence(totals.calories, goals.calorieGoal, 0.67)
+
+  const macroAdherences = [
+    symmetricAdherence(totals.proteinG, goals.proteinGoalG, 1), // full falloff over a 100% miss
+    symmetricAdherence(totals.fatG, goals.fatGoalG, 1),
+    symmetricAdherence(totals.carbsG, goals.carbsGoalG, 1),
+  ]
+  const macroScore = 30 * (macroAdherences.reduce((a, b) => a + b, 0) / macroAdherences.length)
+
+  const varietyCount = uniqueFoodNames(todaysMeals).size
+  const varietyScore = 30 * Math.min(1, varietyCount / VARIETY_REFERENCE_COUNT)
+
+  const score = Math.round(Math.max(0, Math.min(100, calorieScore + macroScore + varietyScore)))
+  return { score, calorieScore: Math.round(calorieScore), macroScore: Math.round(macroScore), varietyScore: Math.round(varietyScore) }
 }
 
 /**

@@ -71,10 +71,10 @@ body,
 #root {
   height: 100%;
   margin: 0;
-  background: var(--color-bg-primary);
   color: var(--color-text-primary);
   font-family: var(--font-sans);
 }
+
 
 /*
  * ============================================================================
