@@ -125,6 +125,42 @@ export function longestProteinGoalStreak(meals: Meal[], goals: Goals): number {
   return best
 }
 
+/**
+ * "Hit the calorie goal" for the Bullseye badge means landing in the goal's actual target
+ * zone — within 90-100% of it — not merely staying under it. Someone who eats 40% of their
+ * goal every day would pass an "under goal" rule despite missing the target badly; this rule
+ * rewards actually hitting it, which is what a goal is for.
+ */
+function hitCalorieGoal(dayCalories: number, goalCalories: number): boolean {
+  return dayCalories >= goalCalories * 0.9 && dayCalories <= goalCalories
+}
+
+/** Longest run ever of consecutive days landing within 90-100% of the calorie goal (the "Bullseye" badge). */
+export function longestCalorieGoalStreak(meals: Meal[], goals: Goals): { length: number; endDate: string | null } {
+  const days = groupMealsByDay(meals)
+  const sortedKeys = [...days.keys()].sort()
+  let best = 0
+  let bestEnd: string | null = null
+  let run = 0
+  let prevKey: string | null = null
+  for (const key of sortedKeys) {
+    const hit = hitCalorieGoal(days.get(key)?.calories ?? 0, goals.calorieGoal)
+    if (!hit) {
+      run = 0
+      prevKey = null
+      continue
+    }
+    const diffDays = prevKey ? Math.round((new Date(key).getTime() - new Date(prevKey).getTime()) / 86_400_000) : null
+    run = diffDays === 1 ? run + 1 : 1
+    if (run > best) {
+      best = run
+      bestEnd = key
+    }
+    prevKey = key
+  }
+  return { length: best, endDate: bestEnd }
+}
+
 /** De-duplicated, trimmed, case-insensitive set of every food name ever logged. */
 export function uniqueFoodNames(meals: Meal[]): Set<string> {
   const set = new Set<string>()

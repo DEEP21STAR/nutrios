@@ -53,6 +53,18 @@ export default defineConfig({
           { src: 'pwa-512x512.png', sizes: '512x512', type: 'image/png' },
           { src: 'pwa-512x512-maskable.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
         ],
+        // Long-press the home-screen icon → these show up as quick actions. The real web-app
+        // equivalent of a native widget shortcut — there's no way to ship an actual live widget
+        // from a browser-based PWA, this is the honest ceiling of what's possible here.
+        shortcuts: [
+          {
+            name: 'Log a meal',
+            short_name: 'Log meal',
+            description: 'Jump straight into the camera to log a meal',
+            url: '/nutrios/?action=log-meal',
+            icons: [{ src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png' }],
+          },
+        ],
       },
       workbox: {
         // Meal photos/API responses are handled by our own IndexedDB offline

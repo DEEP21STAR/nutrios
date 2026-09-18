@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import gsap from 'gsap'
 import { cn, prefersReducedMotion } from '@/lib/utils'
+import { hapticTap } from '@/lib/haptics'
 
 /**
  * NUTRIOS Input Orb — collapsed state. 64px floating glassmorphic button
@@ -44,20 +45,61 @@ export function InputOrbButton({ onClick }: { onClick: () => void }) {
   )
 }
 
-/** Emerald corner-bracket viewfinder decoration — the reusable "AI is watching"
- * treatment. Purely decorative styling framework here (no live per-frame
- * detection exists in this pipeline — identification happens once, after the
- * shutter); the same bracket/tag visual language is reused for real detected
- * items over on the confirm screen (see ConfirmLog.tsx). */
+/**
+ * NUTRIOS's own camera "lens" — the branded viewfinder treatment Deep asked for so opening the
+ * camera feels like part of this app, not a generic file picker. Emerald corner brackets (same
+ * bracket/tag visual language reused for real detected items on the confirm screen) plus a real
+ * GSAP-driven scan-line that sweeps top-to-bottom on a loop while the shutter is live, and a
+ * rotating set of hint captions — genuine motion, not a static decorative frame. Purely visual:
+ * no live per-frame detection exists in this pipeline (identification happens once, after the
+ * shutter), so the sweep communicates "the AI is watching" rather than claiming real-time vision.
+ */
+const SCAN_HINTS = ['Center your meal in frame', 'Good lighting helps accuracy', 'Hold steady for a clear shot']
+
 function ViewfinderBrackets() {
   const corner = 'absolute h-8 w-8 border-[3px] border-accent-health drop-shadow-[0_0_8px_var(--glow-health)]'
+  const scanLineRef = useRef<HTMLDivElement>(null)
+  const [hintIndex, setHintIndex] = useState(0)
+
+  useEffect(() => {
+    const el = scanLineRef.current
+    if (!el || prefersReducedMotion()) return
+    const tl = gsap.timeline({ repeat: -1 })
+    tl.fromTo(el, { top: '2%', opacity: 0 }, { opacity: 1, duration: 0.3 })
+      .to(el, { top: '98%', duration: 1.6, ease: 'sine.inOut' })
+      .to(el, { opacity: 0, duration: 0.3 })
+    return () => {
+      tl.kill()
+    }
+  }, [])
+
+  useEffect(() => {
+    const id = setInterval(() => setHintIndex((i) => (i + 1) % SCAN_HINTS.length), 2600)
+    return () => clearInterval(id)
+  }, [])
+
   return (
-    <div className="pointer-events-none absolute inset-6 sm:inset-10">
-      <div className={cn(corner, 'top-0 left-0 rounded-tl-lg border-r-0 border-b-0')} />
-      <div className={cn(corner, 'top-0 right-0 rounded-tr-lg border-l-0 border-b-0')} />
-      <div className={cn(corner, 'bottom-0 left-0 rounded-bl-lg border-r-0 border-t-0')} />
-      <div className={cn(corner, 'bottom-0 right-0 rounded-br-lg border-l-0 border-t-0')} />
-    </div>
+    <>
+      <div className="pointer-events-none absolute inset-6 overflow-hidden sm:inset-10">
+        <div className={cn(corner, 'top-0 left-0 rounded-tl-lg border-r-0 border-b-0')} />
+        <div className={cn(corner, 'top-0 right-0 rounded-tr-lg border-l-0 border-b-0')} />
+        <div className={cn(corner, 'bottom-0 left-0 rounded-bl-lg border-r-0 border-t-0')} />
+        <div className={cn(corner, 'bottom-0 right-0 rounded-br-lg border-l-0 border-t-0')} />
+        <div
+          ref={scanLineRef}
+          aria-hidden
+          className="absolute inset-x-0 h-[2px]"
+          style={{
+            background: 'linear-gradient(90deg, transparent, var(--color-accent-health), transparent)',
+            boxShadow: '0 0 12px 2px var(--glow-health)',
+            opacity: 0,
+          }}
+        />
+      </div>
+      <p className="pointer-events-none absolute inset-x-0 bottom-[19%] text-center text-caption text-text-secondary drop-shadow-[0_1px_4px_rgba(0,0,0,0.8)]">
+        {SCAN_HINTS[hintIndex]}
+      </p>
+    </>
   )
 }
 
@@ -210,6 +252,7 @@ export function CameraCapture({
   }, [])
 
   function shoot() {
+    hapticTap()
     const video = videoRef.current
     if (!video) return
     const canvas = document.createElement('canvas')

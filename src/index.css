@@ -514,4 +514,35 @@ body,
     animation: none;
     display: none;
   }
+  .identify-scanline {
+    display: none;
+  }
+}
+
+/* "AI is watching" sweep on the identifying-food screen — echoes the camera viewfinder's own
+   scan-line so capture and analysis read as one continuous piece of motion, not two different
+   loading treatments. */
+.identify-scanline {
+  position: absolute;
+  inset-inline: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--color-accent-ai), transparent);
+  box-shadow: 0 0 12px 2px var(--glow-ai);
+  animation: identifyScan 1.6s ease-in-out infinite;
+}
+@keyframes identifyScan {
+  0% {
+    top: 2%;
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    top: 96%;
+    opacity: 0;
+  }
 }

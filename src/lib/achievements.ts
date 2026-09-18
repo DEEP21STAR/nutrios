@@ -2,6 +2,7 @@ import type { Goals, Meal } from '@/lib/types'
 import {
   dateWhenUniqueFoodsReached,
   firstEatingOutMeal,
+  longestCalorieGoalStreak,
   longestLoggingStreak,
   longestProteinGoalStreak,
   uniqueFoodNames,
@@ -18,8 +19,9 @@ export interface Badge {
   earnedOn?: string
   progressCurrent: number
   progressTarget: number
-  /** 'streak' badges get the flame-shaped confetti when newly earned; others get the default burst. */
-  celebration: 'streak' | 'default'
+  /** 'streak' badges get the flame-shaped confetti when newly earned, 'bullseye' gets the
+   * target-shaped burst, others get the default burst. */
+  celebration: 'streak' | 'bullseye' | 'default'
 }
 
 /**
@@ -44,6 +46,7 @@ export function computeBadges(meals: Meal[], goals: Goals): Badge[] {
   const firstMeal = meals.length > 0 ? [...meals].sort((a, b) => a.loggedAt.localeCompare(b.loggedAt))[0] : null
   const { length: bestStreak, endDate: streakEndDate } = longestLoggingStreak(meals)
   const bestProteinStreak = longestProteinGoalStreak(meals, goals)
+  const { length: bestBullseyeStreak, endDate: bullseyeEndDate } = longestCalorieGoalStreak(meals, goals)
   const foods = uniqueFoodNames(meals)
   const firstEatOut = firstEatingOutMeal(meals)
 
@@ -80,6 +83,28 @@ export function computeBadges(meals: Meal[], goals: Goals): Badge[] {
       progressCurrent: Math.min(bestStreak, 30),
       progressTarget: 30,
       celebration: 'streak',
+    },
+    {
+      id: 'streak-100',
+      icon: '⚡',
+      title: 'Unstoppable',
+      description: 'Log meals 100 days in a row',
+      earned: bestStreak >= 100,
+      earnedOn: bestStreak >= 100 ? (streakEndDate ?? undefined) : undefined,
+      progressCurrent: Math.min(bestStreak, 100),
+      progressTarget: 100,
+      celebration: 'streak',
+    },
+    {
+      id: 'bullseye-7',
+      icon: '🎯',
+      title: 'Bullseye',
+      description: 'Land within your calorie goal 7 days in a row',
+      earned: bestBullseyeStreak >= 7,
+      earnedOn: bestBullseyeStreak >= 7 ? (bullseyeEndDate ?? undefined) : undefined,
+      progressCurrent: Math.min(bestBullseyeStreak, 7),
+      progressTarget: 7,
+      celebration: 'bullseye',
     },
     {
       id: 'protein-streak-7',

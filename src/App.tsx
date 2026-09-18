@@ -23,6 +23,8 @@ import { identifyFoodOnDevice, isWebGPUAvailable, type OnDeviceProgress } from '
 import { resizeImage } from '@/lib/imageResize'
 import { resolveIdentifiedItems } from '@/lib/resolveFoodItems'
 import { fireConfetti } from '@/lib/confetti'
+import { playScanSuccessPing } from '@/lib/chime'
+import { hapticSuccess, hapticCelebrate } from '@/lib/haptics'
 import { ensureAuthenticated } from '@/lib/auth'
 import { insertMeal, listTodayMeals, subscribeToMeals } from '@/lib/mealsRepo'
 import { fetchGoals, saveGoals } from '@/lib/goalsRepo'
@@ -48,6 +50,16 @@ export default function App() {
   // case never sees an unnecessary extra line.
   const [identifyingDetail, setIdentifyingDetail] = useState<string | null>(null)
   const [stage, setStage] = useState<Stage>('idle')
+  // One place to react to "identification finished, food recognized" rather than duplicating a
+  // sound/haptic call at every one of handleCapture's several setStage('confirm') exit points
+  // (Ollama success, Gemini success, on-device success, on-device skipped) — this fires exactly
+  // once per transition into 'confirm', regardless of which path got there.
+  useEffect(() => {
+    if (stage === 'confirm') {
+      playScanSuccessPing()
+      hapticSuccess()
+    }
+  }, [stage])
   const [capturedPhoto, setCapturedPhoto] = useState<{ blob: Blob; dataUrl: string } | null>(null)
   const [draftItems, setDraftItems] = useState<FoodItem[]>([])
   // Menu-mode entries carry these into ConfirmLog as pre-filled defaults (still fully editable
@@ -83,6 +95,21 @@ export default function App() {
     applyTheme(stored)
     setTheme(stored)
   }, [])
+
+  // PWA shortcut deep link ("Log a meal" on the home-screen icon's long-press menu, see
+  // vite.config.ts's manifest.shortcuts) — only fires once goals have actually resolved (an
+  // onboarded user), not mid-splash/onboarding, and strips the param so a later reload doesn't
+  // keep reopening the camera.
+  useEffect(() => {
+    if (!goals) return
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('action') === 'log-meal') {
+      setStage('camera')
+      params.delete('action')
+      const next = `${window.location.pathname}${params.toString() ? `?${params}` : ''}`
+      window.history.replaceState({}, '', next)
+    }
+  }, [goals])
 
   async function handleCheckForUpdates(): Promise<boolean> {
     if (!swRegistration) return false
@@ -270,6 +297,7 @@ export default function App() {
       setMeals((prev) => (prev.some((m) => m.id === savedMeal.id) ? prev : [...prev, savedMeal]))
       setStatusMessage(null)
       fireConfetti()
+      hapticCelebrate()
     } catch (err) {
       setStatusMessage(err instanceof Error ? err.message : 'Failed to save meal to Supabase.')
     } finally {
@@ -410,8 +438,9 @@ export default function App() {
 
       {stage === 'identifying' && capturedPhoto && (
         <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-4 bg-bg-primary/95">
-          <div className="glass-card p-2">
+          <div className="glass-card relative overflow-hidden p-2">
             <img src={capturedPhoto.dataUrl} alt="" className="h-40 w-40 rounded-md object-cover opacity-80" />
+            <div className="identify-scanline" aria-hidden />
           </div>
           <p className="text-body text-accent-ai motion-safe:animate-pulse">Identifying food…</p>
           {identifyingDetail && <p className="text-caption text-text-tertiary">{identifyingDetail}</p>}

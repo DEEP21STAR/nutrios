@@ -2,7 +2,8 @@ import { useEffect, useMemo } from 'react'
 import type { Goals, Meal } from '@/lib/types'
 import { computeBadges, getNewlyEarnedBadges, type Badge } from '@/lib/achievements'
 import { cn } from '@/lib/utils'
-import { fireConfetti, fireStreakConfetti } from '@/lib/confetti'
+import { fireConfetti, fireStreakConfetti, fireBullseyeConfetti } from '@/lib/confetti'
+import { hapticCelebrate } from '@/lib/haptics'
 
 /**
  * Achievements/badges (Phase 4) — every badge is computed live from the real `meals` array
@@ -21,7 +22,9 @@ export function Achievements({ meals, goals }: { meals: Meal[]; goals: Goals }) 
     const newly = getNewlyEarnedBadges(badges)
     for (const badge of newly) {
       if (badge.celebration === 'streak') fireStreakConfetti()
+      else if (badge.celebration === 'bullseye') fireBullseyeConfetti()
       else fireConfetti()
+      hapticCelebrate()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [meals, goals])
