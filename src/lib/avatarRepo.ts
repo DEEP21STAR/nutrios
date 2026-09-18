@@ -48,3 +48,16 @@ export async function fetchAvatarUrl(userId: string): Promise<string | null> {
   if (error) throw new Error(`Failed to load profile: ${error.message}`)
   return data?.avatar_url ?? null
 }
+
+/** Powers the Whetū Digital footer's "Built with care for <name>" line (falls back to "you"
+ * when unset — see WhetuFooter.tsx). */
+export async function saveDisplayName(userId: string, name: string): Promise<void> {
+  const { error } = await supabase.from('profiles').upsert({ user_id: userId, display_name: name.trim() || null })
+  if (error) throw new Error(`Failed to save display name: ${error.message}`)
+}
+
+export async function fetchDisplayName(userId: string): Promise<string | null> {
+  const { data, error } = await supabase.from('profiles').select('display_name').eq('user_id', userId).maybeSingle()
+  if (error) throw new Error(`Failed to load profile: ${error.message}`)
+  return data?.display_name ?? null
+}

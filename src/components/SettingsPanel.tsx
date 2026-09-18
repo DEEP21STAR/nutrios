@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { applyTheme, type Theme } from '@/lib/theme'
 import { AvatarPicker } from '@/components/AvatarPicker'
 import { isPremiumUnlocked, setPremiumUnlocked } from '@/lib/premium'
+import { saveDisplayName } from '@/lib/avatarRepo'
 
 interface SettingsPanelProps {
   onClose: () => void
@@ -13,6 +14,8 @@ interface SettingsPanelProps {
   userId: string | null
   avatarUrl: string | null
   onAvatarChange: (avatar: string) => void
+  displayName: string | null
+  onDisplayNameChange: (name: string) => void
 }
 
 /**
@@ -31,8 +34,12 @@ export function SettingsPanel({
   userId,
   avatarUrl,
   onAvatarChange,
+  displayName,
+  onDisplayNameChange,
 }: SettingsPanelProps) {
   const [checkState, setCheckState] = useState<'idle' | 'checking' | 'up-to-date'>('idle')
+  const [nameInput, setNameInput] = useState(displayName ?? '')
+  const [savingName, setSavingName] = useState(false)
   // Every setting here applies instantly (no explicit Save action) — that's correct behavior,
   // but tapping something and seeing nothing happen looks exactly like it silently failed. This
   // toast is the fix: real, if quiet, confirmation instead of just trusting the selected-border
@@ -75,6 +82,39 @@ export function SettingsPanel({
                 flashToast('Profile picture saved')
               }}
             />
+            <div className="flex flex-col gap-1.5">
+              <label className="text-caption text-text-tertiary">
+                Your name — shown in the footer's "Built with care for…" line
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={nameInput}
+                  onChange={(e) => setNameInput(e.target.value)}
+                  placeholder="Your name"
+                  maxLength={40}
+                  className="flex-1 rounded-xl border border-white/10 bg-bg-secondary px-3 py-2 text-body text-text-primary outline-none focus:border-accent-health"
+                />
+                <button
+                  onClick={async () => {
+                    setSavingName(true)
+                    try {
+                      await saveDisplayName(userId, nameInput)
+                      onDisplayNameChange(nameInput)
+                      flashToast('Name saved')
+                    } catch (err) {
+                      flashToast(err instanceof Error ? err.message : 'Failed to save name')
+                    } finally {
+                      setSavingName(false)
+                    }
+                  }}
+                  disabled={savingName}
+                  className="rounded-xl bg-accent-health px-4 py-2 text-caption font-semibold text-bg-primary disabled:opacity-50"
+                >
+                  {savingName ? 'Saving…' : 'Save'}
+                </button>
+              </div>
+            </div>
           </section>
         )}
 

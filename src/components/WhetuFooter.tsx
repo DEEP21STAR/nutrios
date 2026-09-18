@@ -7,7 +7,7 @@
  * NUTRIOS has no third-party client the way Clarity (Mimi) or Voyager
  * (Sachind) do, so the "built with care for" line reads generically.
  */
-export function WhetuFooter({ className }: { className?: string }) {
+export function WhetuFooter({ className, name }: { className?: string; name?: string | null }) {
   return (
     <div className={`wfd-footer ${className ?? ''}`}>
       <div className="wfd-logo">WHETŪ DIGITAL</div>
@@ -17,7 +17,8 @@ export function WhetuFooter({ className }: { className?: string }) {
         <a href="mailto:hello@whetudigital.co.nz">hello@whetudigital.co.nz</a>
       </div>
       <span className="wfd-ded">
-        Built with care for you <span className="wfd-heart">♥</span>
+        Built with care for <span className="wfd-name">{name?.trim() || 'you'}</span>{' '}
+        <span className="wfd-heart">♥</span>
       </span>
       <span className="wfd-badge">NUTRIOS · Whetū Digital {new Date().getFullYear()}</span>
     </div>

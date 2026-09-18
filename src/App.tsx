@@ -29,7 +29,7 @@ import { hapticSuccess, hapticCelebrate } from '@/lib/haptics'
 import { ensureAuthenticated } from '@/lib/auth'
 import { insertMeal, listTodayMeals, subscribeToMeals } from '@/lib/mealsRepo'
 import { fetchGoals, saveGoals } from '@/lib/goalsRepo'
-import { fetchAvatarUrl } from '@/lib/avatarRepo'
+import { fetchAvatarUrl, fetchDisplayName } from '@/lib/avatarRepo'
 import { sumMacros, DEFAULT_GOALS, type FoodItem, type Goals, type Meal } from '@/lib/types'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 
@@ -81,6 +81,7 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false)
   const [swRegistration, setSwRegistration] = useState<ServiceWorkerRegistration | undefined>(undefined)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+  const [displayName, setDisplayName] = useState<string | null>(null)
 
   const { needRefresh: [needRefresh], updateServiceWorker } = useRegisterSW({
     onRegisteredSW(_url, registration) {
@@ -158,6 +159,10 @@ export default function App() {
         const savedAvatar = await fetchAvatarUrl(user.id)
         if (cancelled) return
         setAvatarUrl(savedAvatar)
+
+        const savedName = await fetchDisplayName(user.id)
+        if (cancelled) return
+        setDisplayName(savedName)
       } catch (err) {
         if (!cancelled) setAuthError(err instanceof Error ? err.message : 'Supabase sign-in failed.')
       }
@@ -375,6 +380,8 @@ export default function App() {
           userId={userId}
           avatarUrl={avatarUrl}
           onAvatarChange={setAvatarUrl}
+          displayName={displayName}
+          onDisplayNameChange={setDisplayName}
         />
       )}
 
@@ -416,7 +423,7 @@ export default function App() {
           footer stranded mid-page with a big dead gap before the fixed camera/tab-bar clearance
           below (real bug, caught from a live screenshot: looked like the footer "wasn't at the
           bottom" even though it was technically the last DOM child). */}
-      <WhetuFooter className="mt-auto" />
+      <WhetuFooter className="mt-auto" name={displayName} />
 
       <InputOrbButton onClick={() => setStage('mode-select')} />
       <TabBar active={activeTab} onChange={setActiveTab} />

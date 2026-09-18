@@ -457,11 +457,29 @@ body,
   color: rgb(255 255 255 / 60%);
   letter-spacing: 1px;
 }
+/* The user's name inside "Built with care for <name>" — deliberately breaks from the
+   surrounding pink/white shimmer with NUTRIOS's own emerald, so a real name reads as the
+   personal, specific part of the line rather than blending into the generic brand copy. */
+.wfd-name {
+  -webkit-text-fill-color: #00e5a0;
+  color: #00e5a0;
+  font-weight: 700;
+  animation: wfdNameGlow 1.8s ease-in-out infinite alternate;
+}
+@keyframes wfdNameGlow {
+  from {
+    filter: drop-shadow(0 0 4px rgb(0 229 160 / 40%));
+  }
+  to {
+    filter: drop-shadow(0 0 12px rgb(0 229 160 / 90%));
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   .wfd-logo,
   .wfd-logo::after,
   .wfd-ded,
-  .wfd-heart {
+  .wfd-heart,
+  .wfd-name {
     animation: none !important;
   }
 }
