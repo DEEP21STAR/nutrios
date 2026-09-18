@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { applyTheme, type Theme } from '@/lib/theme'
 import { AvatarPicker } from '@/components/AvatarPicker'
+import { isPremiumUnlocked, setPremiumUnlocked } from '@/lib/premium'
 
 interface SettingsPanelProps {
   onClose: () => void
@@ -43,6 +44,8 @@ export function SettingsPanel({
     setToast(text)
     setTimeout(() => setToast(null), 1600)
   }
+
+  const [premium, setPremium] = useState(isPremiumUnlocked)
 
   async function handleCheck() {
     setCheckState('checking')
@@ -96,6 +99,51 @@ export function SettingsPanel({
               </button>
             ))}
           </div>
+        </section>
+
+        <section className="glass-card flex flex-col gap-3 p-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-body font-semibold">Premium</h3>
+            {premium && (
+              <span className="rounded-full bg-accent-energy/15 px-2 py-0.5 text-caption font-semibold text-accent-energy">
+                Unlocked
+              </span>
+            )}
+          </div>
+          <ul className="flex flex-col gap-1.5 text-caption text-text-secondary">
+            <li>• Unlimited progress-photo history</li>
+            <li>• Priority AI food recognition</li>
+            <li>• Custom app themes as they ship</li>
+          </ul>
+          {premium ? (
+            <button
+              onClick={() => {
+                setPremiumUnlocked(false)
+                setPremium(false)
+                flashToast('Premium turned off')
+              }}
+              className="rounded-xl border border-white/10 bg-bg-secondary py-3 text-body text-text-secondary"
+            >
+              Turn off Premium
+            </button>
+          ) : (
+            <>
+              <p className="text-caption text-text-tertiary">
+                NUTRIOS stays free — Premium is donation-supported. Donation details aren't set up
+                yet; check back soon, or unlock now on trust.
+              </p>
+              <button
+                onClick={() => {
+                  setPremiumUnlocked(true)
+                  setPremium(true)
+                  flashToast('Premium unlocked — thank you')
+                }}
+                className="rounded-xl bg-accent-energy py-3 text-body font-semibold text-bg-primary"
+              >
+                Unlock Premium
+              </button>
+            </>
+          )}
         </section>
 
         <section className="glass-card flex flex-col gap-3 p-4">

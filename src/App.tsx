@@ -10,6 +10,7 @@ import { TipsTicker } from '@/components/TipsTicker'
 import { Achievements } from '@/components/Achievements'
 import { TogetherMode } from '@/components/TogetherMode'
 import { TrendsHistory } from '@/components/TrendsHistory'
+import { ProgressPhotos } from '@/components/ProgressPhotos'
 import { TabBar, type TabKey } from '@/components/TabBar'
 import { WhetuFooter } from '@/components/WhetuFooter'
 import { SplashScreen } from '@/components/SplashScreen'
@@ -400,6 +401,9 @@ export default function App() {
           {/* Phase 5, Trends & History — real weekly calorie bar chart + weight trend (or its
               honest empty state). */}
           <TrendsHistory userId={userId} goals={goals ?? DEFAULT_GOALS} />
+          {/* Progress photos — private timeline + before/after compare + share, its own
+              top-level section matching Achievements/TrendsHistory's pattern. */}
+          {userId && <ProgressPhotos userId={userId} />}
         </>
       )}
 
