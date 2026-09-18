@@ -21,9 +21,14 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
-      - run: npm ci
+      # --ignore-scripts: onnxruntime-node (a transitive dep of @huggingface/transformers,
+      # pulled in for its Node-native build even though this app only ever uses the browser/WASM
+      # build) tries to download a platform binary on install and that download intermittently
+      # times out on GitHub-hosted runners. It's never imported by the actual browser bundle —
+      # verified locally that `vite build` produces an identical dist/ with scripts skipped.
+      - run: npm ci --ignore-scripts
       - run: npm run build
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
