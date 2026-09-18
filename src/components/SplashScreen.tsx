@@ -9,27 +9,47 @@ const CATEGORY_HOLD = 1.35
 const CATEGORY_EXIT = 0.3
 const CATEGORY_BEAT = CATEGORY_ENTER + CATEGORY_HOLD + CATEGORY_EXIT
 
-const WORDMARK_DURATION = 0.5
-const HOLD_DURATION = 0.4
-const IRIS_DURATION = 0.5
-
 const PARTICLE_ANGLES = [0, 45, 90, 135, 180, 225, 270, 315]
+
+const WORDMARK_LETTERS = [
+  { ch: 'N', color: '#00e5a0' },
+  { ch: 'U', color: '#00d4c4' },
+  { ch: 'T', color: '#10d8ff' },
+  { ch: 'R', color: '#8b5cf6' },
+  { ch: 'I', color: '#c040ff' },
+]
+const RING_COLOR = '#00e5a0'
+const S_COLOR = '#ffb800'
+
+const LETTER_ENTER = 0.45
+const LETTER_STAGGER = 0.09
+const WORDMARK_ENTER_TOTAL = LETTER_ENTER + LETTER_STAGGER * (WORDMARK_LETTERS.length + 1)
+const HOLD_MS = 1300
+const IRIS_DURATION = 0.5
 
 /**
  * Two versions of the same splash. First-ever open plays the full six-category tour — a real
  * feature tour (AI scan, meals, training, weigh-ins, progress, together mode), each icon from
- * lucide-react (a real professionally-drawn icon set, not hand-authored SVG paths) held on
- * screen long enough to actually read, with a particle burst and glow on arrival — matching the
- * dwell time of the reference this was modeled on rather than rushing through it. Every later
- * open plays a short ~1.6s version (straight to the wordmark) so the full tour doesn't become
- * something to sit through every single day.
+ * lucide-react held on screen long enough to actually read. Every later open plays a short
+ * version straight to the wordmark, via a localStorage flag, so the full tour isn't something to
+ * sit through daily.
  *
- * The splash stays fully opaque for its entire runtime. The real app is revealed exactly once,
- * in the final iris-wipe — never leaked through earlier via a see-through background.
+ * The wordmark itself is real kinetic typography: each letter pops in individually (scaled up,
+ * staggered), settling together — not a single blurred block fading in at once.
  *
- * `finish()` is guarded so it only fires once, and a setTimeout watchdog calls it unconditionally
- * after the animation's own worst-case duration — the one guarantee that survives no matter what
- * happens to the GSAP/rAF-driven animation itself.
+ * The hold-then-reveal at the end is DELIBERATELY its own timeline, started via a fresh
+ * setTimeout only once the entrance animation genuinely finishes — not chained onto the same
+ * GSAP timeline as everything before it. That matters: a GSAP timeline tracks real elapsed time,
+ * so if the browser's render thread stalls even briefly (screen-recording overhead, a background
+ * tab, a slow moment), the timeline "catches up" by jumping straight through every tween that
+ * should already have finished — which is exactly what made the wordmark flash for a fraction of
+ * a second and vanish on a real device recording. Anchoring the hold to a setTimeout scheduled
+ * fresh at the real moment the entrance finishes guarantees it's actually visible for that long,
+ * regardless of what happened earlier in the sequence.
+ *
+ * The splash must never be able to trap someone behind it. `finish()` is guarded so it only fires
+ * once, and a plain `setTimeout` watchdog calls it unconditionally after the animation's own
+ * worst-case duration as a last-resort guarantee.
  */
 export function SplashScreen({ onDone }: { onDone: () => void }) {
   const rootRef = useRef<HTMLDivElement>(null)
@@ -37,7 +57,10 @@ export function SplashScreen({ onDone }: { onDone: () => void }) {
   const particleRefs = useRef<(HTMLDivElement | null)[]>([])
   const dotRefs = useRef<(HTMLDivElement | null)[]>([])
   const wordmarkRef = useRef<HTMLDivElement>(null)
-  const ringRef = useRef<SVGCircleElement>(null)
+  const letterRefs = useRef<(HTMLSpanElement | null)[]>([])
+  const ringWrapRef = useRef<HTMLDivElement>(null)
+  const sRef = useRef<HTMLSpanElement>(null)
+  const taglineRef = useRef<HTMLSpanElement>(null)
 
   useEffect(() => {
     const isFirstRun = !localStorage.getItem(INTRO_SEEN_KEY)
@@ -48,7 +71,7 @@ export function SplashScreen({ onDone }: { onDone: () => void }) {
     }
 
     const categoryTotal = isFirstRun ? SPLASH_CATEGORIES.length * CATEGORY_BEAT : 0
-    const totalEstimateMs = (categoryTotal + WORDMARK_DURATION + HOLD_DURATION + IRIS_DURATION + 0.3) * 1000
+    const totalEstimateMs = (categoryTotal + WORDMARK_ENTER_TOTAL) * 1000 + HOLD_MS + IRIS_DURATION * 1000
 
     let done = false
     const finish = () => {
@@ -56,7 +79,7 @@ export function SplashScreen({ onDone }: { onDone: () => void }) {
       done = true
       onDone()
     }
-    const watchdog = setTimeout(finish, totalEstimateMs + 2500)
+    const watchdog = setTimeout(finish, totalEstimateMs + 3000)
 
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     if (reduceMotion) {
@@ -67,7 +90,7 @@ export function SplashScreen({ onDone }: { onDone: () => void }) {
       }
     }
 
-    const tl = gsap.timeline({ onComplete: finish })
+    const tl = gsap.timeline()
 
     if (isFirstRun) {
       SPLASH_CATEGORIES.forEach((cat, i) => {
@@ -101,15 +124,22 @@ export function SplashScreen({ onDone }: { onDone: () => void }) {
       })
     }
 
-    tl.to(ringRef.current, { opacity: 1, strokeWidth: 8, duration: 0.3, ease: 'power2.out' })
-      .fromTo(
-        wordmarkRef.current,
-        { opacity: 0, filter: 'blur(10px)', y: 8 },
-        { opacity: 1, filter: 'blur(0px)', y: 0, duration: WORDMARK_DURATION, ease: 'power2.out' },
-        '<',
-      )
-      .to({}, { duration: HOLD_DURATION })
-      .to(rootRef.current, { clipPath: 'circle(0% at 50% 50%)', duration: IRIS_DURATION, ease: 'power3.in' })
+    tl.set(wordmarkRef.current, { opacity: 1 })
+    const popTargets = [...letterRefs.current, ringWrapRef.current, sRef.current]
+    tl.fromTo(
+      popTargets,
+      { opacity: 0, scale: 2.6, y: 4 },
+      { opacity: 1, scale: 1, y: 0, duration: LETTER_ENTER, ease: 'back.out(2.4)', stagger: LETTER_STAGGER },
+    )
+    tl.to(taglineRef.current, { opacity: 1, duration: 0.4, ease: 'power2.out' }, '-=0.2')
+
+    tl.eventCallback('onComplete', () => {
+      setTimeout(() => {
+        gsap
+          .timeline({ onComplete: finish })
+          .to(rootRef.current, { clipPath: 'circle(0% at 50% 50%)', duration: IRIS_DURATION, ease: 'power3.in' })
+      }, HOLD_MS)
+    })
 
     return () => {
       clearTimeout(watchdog)
@@ -192,56 +222,59 @@ export function SplashScreen({ onDone }: { onDone: () => void }) {
 
       <div className="absolute flex flex-col items-center gap-[1.4vh]" style={{ opacity: 0 }} ref={wordmarkRef}>
         <div className="flex items-center" style={{ fontFamily: 'var(--font-display)' }}>
+          {WORDMARK_LETTERS.map((l, i) => (
+            <span
+              key={l.ch}
+              ref={(el) => {
+                letterRefs.current[i] = el
+              }}
+              className="inline-block font-bold tracking-[0.14em]"
+              style={{
+                fontSize: 'clamp(28px, 6.5vh, 52px)',
+                color: l.color,
+                filter: `drop-shadow(0 0 16px ${l.color})`,
+                opacity: 0,
+              }}
+            >
+              {l.ch}
+            </span>
+          ))}
+          <div
+            ref={ringWrapRef}
+            className="inline-flex items-center justify-center"
+            style={{ opacity: 0, margin: '0 0.05em' }}
+          >
+            <svg
+              viewBox="0 0 100 100"
+              style={{
+                width: 'clamp(24px, 5.4vh, 42px)',
+                height: 'clamp(24px, 5.4vh, 42px)',
+                filter: `drop-shadow(0 0 14px ${RING_COLOR})`,
+              }}
+            >
+              <circle cx="50" cy="50" r="38" fill="none" stroke={RING_COLOR} strokeWidth="9" />
+            </svg>
+          </div>
           <span
-            className="font-bold tracking-[0.14em]"
+            ref={sRef}
+            className="inline-block font-bold tracking-[0.14em]"
             style={{
               fontSize: 'clamp(28px, 6.5vh, 52px)',
-              backgroundImage: 'linear-gradient(90deg, var(--color-accent-health), var(--color-accent-ai))',
-              backgroundClip: 'text',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              color: 'transparent',
-              filter: 'drop-shadow(0 0 18px rgb(0 229 160 / 0.35))',
-            }}
-          >
-            NUTRI
-          </span>
-          <svg
-            viewBox="0 0 100 100"
-            style={{
-              width: 'clamp(24px, 5.4vh, 42px)',
-              height: 'clamp(24px, 5.4vh, 42px)',
-              margin: '0 0.05em',
-              filter: 'drop-shadow(0 0 12px var(--glow-health))',
-            }}
-          >
-            <circle
-              ref={ringRef}
-              cx="50"
-              cy="50"
-              r="38"
-              fill="none"
-              stroke="var(--color-accent-health)"
-              strokeWidth="4"
-              opacity="0.55"
-            />
-          </svg>
-          <span
-            className="font-bold tracking-[0.14em]"
-            style={{
-              fontSize: 'clamp(28px, 6.5vh, 52px)',
-              backgroundImage: 'linear-gradient(90deg, var(--color-accent-ai), var(--color-accent-energy))',
-              backgroundClip: 'text',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              color: 'transparent',
-              filter: 'drop-shadow(0 0 18px rgb(139 92 246 / 0.35))',
+              color: S_COLOR,
+              filter: `drop-shadow(0 0 16px ${S_COLOR})`,
+              opacity: 0,
             }}
           >
             S
           </span>
         </div>
-        <span className="text-caption tracking-[0.3em] text-text-tertiary">EAT SMART · TRAIN HARD · TRACK REAL</span>
+        <span
+          ref={taglineRef}
+          className="text-caption tracking-[0.3em] text-text-tertiary"
+          style={{ opacity: 0 }}
+        >
+          EAT SMART · TRAIN HARD · TRACK REAL
+        </span>
       </div>
     </div>
   )
