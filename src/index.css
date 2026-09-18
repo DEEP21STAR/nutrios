@@ -217,3 +217,255 @@ body,
     animation: none !important;
   }
 }
+
+/*
+ * Whetū Digital trademark footer — ported verbatim, colors included, from
+ * the live Clarity dashboard (deep21star.github.io/clarity). This is the
+ * company brand mark, not an app-themed element — it stays cyan/purple on
+ * every Whetū product so the trademark reads as one consistent brand,
+ * regardless of which app's own color tokens surround it. Don't retint
+ * this to match whatever app it's dropped into.
+ */
+.wfd-footer {
+  background: linear-gradient(135deg, #04050f, #070c1e);
+  border-top: 1px solid rgb(16 216 255 / 15%);
+  padding: 22px 24px 20px;
+  text-align: center;
+  margin-top: 32px;
+}
+.wfd-logo {
+  font-size: 24px;
+  font-weight: 900;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  display: inline-block;
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(90deg, #fff 0%, #10d8ff 22%, #c040ff 50%, #fff 72%, #10d8ff 100%);
+  background-size: 300% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  animation:
+    wfdSwing 8.5s ease-in-out infinite,
+    wfdGlow 9s ease-in-out infinite,
+    wfdAurora 7s ease-in-out infinite;
+  transform-style: preserve-3d;
+  margin-bottom: 6px;
+}
+.wfd-logo::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 55px;
+  background: linear-gradient(90deg, transparent, rgb(16 216 255 / 55%), rgb(192 64 255 / 28%), transparent);
+  animation: wfdShimmer 6s ease-in-out infinite;
+  pointer-events: none;
+  filter: blur(3px);
+}
+@keyframes wfdSwing {
+  0% {
+    transform: perspective(700px) rotateY(-22deg) rotateX(8deg) translateZ(-10px);
+  }
+  18% {
+    transform: perspective(700px) rotateY(6deg) rotateX(-5deg) translateZ(18px);
+  }
+  38% {
+    transform: perspective(700px) rotateY(24deg) rotateX(9deg) translateZ(-8px);
+  }
+  55% {
+    transform: perspective(700px) rotateY(-4deg) rotateX(-7deg) translateZ(22px);
+  }
+  74% {
+    transform: perspective(700px) rotateY(-20deg) rotateX(5deg) translateZ(-12px);
+  }
+  100% {
+    transform: perspective(700px) rotateY(-22deg) rotateX(8deg) translateZ(-10px);
+  }
+}
+@keyframes wfdGlow {
+  0%,
+  88%,
+  100% {
+    filter: drop-shadow(0 0 8px rgb(16 216 255 / 60%)) drop-shadow(0 0 18px rgb(192 64 255 / 30%));
+  }
+  89% {
+    filter: drop-shadow(-4px 0 rgb(16 216 255 / 95%)) drop-shadow(4px 0 rgb(192 64 255 / 95%));
+  }
+  91% {
+    filter: drop-shadow(4px 0 rgb(16 216 255 / 95%)) drop-shadow(-4px 0 rgb(192 64 255 / 95%));
+  }
+  95% {
+    filter: drop-shadow(0 0 12px rgb(16 216 255 / 50%)) drop-shadow(0 0 30px rgb(192 64 255 / 25%));
+  }
+}
+@keyframes wfdAurora {
+  0% {
+    background-position: 100% 50%;
+  }
+  50% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 100% 50%;
+  }
+}
+@keyframes wfdShimmer {
+  0% {
+    left: -120%;
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.6;
+  }
+  90% {
+    opacity: 0.5;
+  }
+  100% {
+    left: 120%;
+    opacity: 0;
+  }
+}
+.wfd-tagline {
+  font-size: 12px;
+  color: rgb(255 255 255 / 50%);
+  letter-spacing: 2px;
+  margin: 0 0 10px;
+}
+.wfd-copy {
+  font-size: 11px;
+  color: rgb(255 255 255 / 40%);
+  letter-spacing: 1px;
+  margin-bottom: 12px;
+}
+.wfd-copy a {
+  color: rgb(16 216 255 / 60%);
+  text-decoration: none;
+}
+.wfd-ded {
+  font-size: 14px;
+  letter-spacing: 2px;
+  margin: 0 0 10px;
+  display: block;
+  background: linear-gradient(90deg, rgb(255 255 255 / 70%) 0%, #fff 40%, #ffb3c6 70%, rgb(255 255 255 / 70%) 100%);
+  background-size: 300% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation:
+    wfdDedA 4s ease-in-out infinite,
+    wfdDedG 3s ease-in-out infinite alternate;
+}
+@keyframes wfdDedA {
+  0% {
+    background-position: 100% 50%;
+  }
+  50% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 100% 50%;
+  }
+}
+@keyframes wfdDedG {
+  from {
+    filter: drop-shadow(0 0 4px rgb(255 160 180 / 30%));
+  }
+  to {
+    filter: drop-shadow(0 0 14px rgb(255 160 180 / 90%));
+  }
+}
+.wfd-heart {
+  -webkit-text-fill-color: #ff6b8a;
+  color: #ff6b8a;
+  display: inline-block;
+  animation: wfdHB 1.4s ease-in-out infinite;
+}
+@keyframes wfdHB {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  14% {
+    transform: scale(1.35);
+  }
+  28% {
+    transform: scale(1);
+  }
+  42% {
+    transform: scale(1.2);
+  }
+  56% {
+    transform: scale(1);
+  }
+}
+.wfd-badge {
+  display: inline-block;
+  padding: 4px 14px;
+  border-radius: 20px;
+  background: rgb(16 216 255 / 6%);
+  border: 1px solid rgb(16 216 255 / 20%);
+  font-size: 11px;
+  color: rgb(255 255 255 / 60%);
+  letter-spacing: 1px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .wfd-logo,
+  .wfd-logo::after,
+  .wfd-ded,
+  .wfd-heart {
+    animation: none !important;
+  }
+}
+
+/* Splash screen — one settle-in, one glow pulse, done. See SplashScreen.tsx's own header
+   comment for why this is deliberately short and restrained rather than elaborate. */
+.splash-mark {
+  opacity: 0;
+  transform: scale(0.85);
+  animation: splashSettle 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+@keyframes splashSettle {
+  0% {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.splash-ring {
+  position: absolute;
+  width: min(56vw, 260px);
+  height: min(56vw, 260px);
+  border-radius: 999px;
+  border: 1px solid rgb(0 229 160 / 25%);
+  animation: splashRingPulse 1.6s ease-out forwards;
+}
+@keyframes splashRingPulse {
+  0% {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+  40% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.4);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .splash-mark {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+  .splash-ring {
+    animation: none;
+    display: none;
+  }
+}

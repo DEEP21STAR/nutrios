@@ -11,6 +11,9 @@ import { Achievements } from '@/components/Achievements'
 import { TogetherMode } from '@/components/TogetherMode'
 import { TrendsHistory } from '@/components/TrendsHistory'
 import { TabBar, type TabKey } from '@/components/TabBar'
+import { WhetuFooter } from '@/components/WhetuFooter'
+import { SplashScreen } from '@/components/SplashScreen'
+import { OnboardingWizard } from '@/components/OnboardingWizard'
 import { identifyFoodViaOllama } from '@/lib/ollamaVision'
 import { identifyFoodViaGemini } from '@/lib/geminiVision'
 import { identifyFoodOnDevice, isWebGPUAvailable, type OnDeviceProgress } from '@/lib/onDeviceVision'
@@ -19,7 +22,8 @@ import { resolveIdentifiedItems } from '@/lib/resolveFoodItems'
 import { fireConfetti } from '@/lib/confetti'
 import { ensureAuthenticated } from '@/lib/auth'
 import { insertMeal, listTodayMeals, subscribeToMeals } from '@/lib/mealsRepo'
-import { sumMacros, DEFAULT_GOALS, type FoodItem, type Meal } from '@/lib/types'
+import { fetchGoals, saveGoals } from '@/lib/goalsRepo'
+import { sumMacros, DEFAULT_GOALS, type FoodItem, type Goals, type Meal } from '@/lib/types'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 
 type Stage = 'idle' | 'mode-select' | 'camera' | 'voice' | 'menu' | 'identifying' | 'confirm' | 'logging'
@@ -51,6 +55,11 @@ export default function App() {
   const [statusMessage, setStatusMessage] = useState<string | null>(null)
   const [userId, setUserId] = useState<string | null>(null)
   const [authError, setAuthError] = useState<string | null>(null)
+  const [showSplash, setShowSplash] = useState(true)
+  // null = still loading (or genuinely not onboarded yet); DEFAULT_GOALS is only ever used as a
+  // placeholder while this resolves, never persisted or shown as if it were the real target.
+  const [goals, setGoals] = useState<Goals | null>(null)
+  const [needsOnboarding, setNeedsOnboarding] = useState(false)
 
   // Bootstrap: real Supabase anonymous auth + real meals load + real
   // realtime subscription for cross-device sync. No mock data anywhere in
@@ -72,6 +81,17 @@ export default function App() {
         channel = subscribeToMeals(user.id, (meal) => {
           setMeals((prev) => (prev.some((m) => m.id === meal.id) ? prev : [...prev, meal]))
         })
+
+        // The `goals` table has existed since the very first migration, but nothing ever read
+        // or wrote it until the onboarding wizard — every screen used DEFAULT_GOALS regardless
+        // of who was using the app. A missing row means this user genuinely hasn't onboarded yet.
+        const savedGoals = await fetchGoals(user.id)
+        if (cancelled) return
+        if (savedGoals) {
+          setGoals(savedGoals)
+        } else {
+          setNeedsOnboarding(true)
+        }
       } catch (err) {
         if (!cancelled) setAuthError(err instanceof Error ? err.message : 'Supabase sign-in failed.')
       }
@@ -223,6 +243,28 @@ export default function App() {
     }
   }
 
+  async function handleOnboardingComplete(newGoals: Goals) {
+    setGoals(newGoals)
+    setNeedsOnboarding(false)
+    if (userId) {
+      try {
+        await saveGoals(userId, newGoals)
+      } catch (err) {
+        // Real goals are already in state and the app is usable either way — a failed write just
+        // means this device's answers won't persist across reloads/devices yet, not a blocker.
+        setStatusMessage(err instanceof Error ? err.message : 'Could not save your goals to Supabase.')
+      }
+    }
+  }
+
+  if (showSplash) {
+    return <SplashScreen onDone={() => setShowSplash(false)} />
+  }
+
+  if (needsOnboarding) {
+    return <OnboardingWizard onComplete={handleOnboardingComplete} />
+  }
+
   return (
     <div className="relative z-10 mx-auto min-h-screen max-w-md overflow-x-hidden pb-40 text-text-primary">
       {/* Ambient background glow — subtle, static, sits behind everything. Starfield canvas
@@ -247,12 +289,12 @@ export default function App() {
           so none of them had to change their own data-fetching logic. */}
       {activeTab === 'today' && (
         <>
-          <TodayRing totals={totals} goals={DEFAULT_GOALS} />
+          <TodayRing totals={totals} goals={goals ?? DEFAULT_GOALS} />
           {/* Phase 5, Healthy Score — added alongside TodayRing, not replacing any part of it
               (see HealthyScoreGauge.tsx's own header comment for why). */}
-          <HealthyScoreGauge totals={totals} goals={DEFAULT_GOALS} todaysMeals={meals} />
+          <HealthyScoreGauge totals={totals} goals={goals ?? DEFAULT_GOALS} todaysMeals={meals} />
           <MealTimeline meals={meals} />
-          <TipsTicker meals={meals} goals={DEFAULT_GOALS} />
+          <TipsTicker meals={meals} goals={goals ?? DEFAULT_GOALS} />
         </>
       )}
 
@@ -260,14 +302,16 @@ export default function App() {
         <>
           {/* Phase 4 — achievements computed from real meal history, see the component's own
               header comment for what's real vs. demo. */}
-          <Achievements meals={meals} goals={DEFAULT_GOALS} />
+          <Achievements meals={meals} goals={goals ?? DEFAULT_GOALS} />
           {/* Phase 5, Trends & History — real weekly calorie bar chart + weight trend (or its
               honest empty state). */}
-          <TrendsHistory userId={userId} goals={DEFAULT_GOALS} />
+          <TrendsHistory userId={userId} goals={goals ?? DEFAULT_GOALS} />
         </>
       )}
 
-      {activeTab === 'together' && <TogetherMode meals={meals} goals={DEFAULT_GOALS} />}
+      {activeTab === 'together' && <TogetherMode meals={meals} goals={goals ?? DEFAULT_GOALS} />}
+
+      <WhetuFooter />
 
       <InputOrbButton onClick={() => setStage('mode-select')} />
       <TabBar active={activeTab} onChange={setActiveTab} />
@@ -309,7 +353,7 @@ export default function App() {
           initialIsEatingOut={draftIsEatingOut}
           initialRestaurantName={draftRestaurantName}
           todaysTotals={totals}
-          goals={DEFAULT_GOALS}
+          goals={goals ?? DEFAULT_GOALS}
           identificationNote={statusMessage}
           onConfirm={handleConfirm}
           onCancel={() => {
