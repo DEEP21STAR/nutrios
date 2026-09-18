@@ -14,12 +14,3 @@ interface ImportMeta {
 /** Injected by vite.config.ts's `define` — real git commit count / short hash at build time. */
 declare const __BUILD_NUMBER__: string
 declare const __COMMIT_HASH__: string
-
-/** flubber ships no types; only `interpolate` is used here, typed narrowly rather than `any`. */
-declare module 'flubber' {
-  export function interpolate(
-    fromShape: string,
-    toShape: string,
-    options?: { maxSegmentLength?: number | false },
-  ): (t: number) => string
-}
