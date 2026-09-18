@@ -70,21 +70,48 @@ export function computeYourChallengeValue(challenge: ChallengeType, meals: Meal[
   }
 }
 
+export interface RealMemberStat {
+  userId: string
+  name: string
+  avatar: string
+  value: number
+}
+
+/**
+ * `realMembers` (2026-09-18) — actual household members (see lib/household.ts), each already
+ * carrying their own real value for the current challenge. When at least one exists, the demo
+ * rows are dropped entirely rather than mixed in — the moment a real second person is in your
+ * household, showing fake ones alongside them stops being an honest preview and starts being
+ * confusing filler. Solo (no household, or a household with nobody else in it yet) keeps the
+ * demo preview exactly as before.
+ */
 export function buildLeaderboard(
   challenge: ChallengeType,
   meals: Meal[],
   goals: Goals,
   yourDisplayName: string,
-  yourAvatar?: string | null,
+  yourAvatar: string | null | undefined,
+  realMembers: RealMemberStat[] = [],
 ): LeaderboardEntry[] {
   const yourValue = computeYourChallengeValue(challenge, meals, goals)
-  const demoEntries: LeaderboardEntry[] = DEMO_FRIENDS.map((f) => ({
-    id: f.name,
-    name: f.name,
-    avatar: f.avatar,
-    value: f.seeds[challenge],
+  const demoEntries: LeaderboardEntry[] =
+    realMembers.length > 0
+      ? []
+      : DEMO_FRIENDS.map((f) => ({
+          id: f.name,
+          name: f.name,
+          avatar: f.avatar,
+          value: f.seeds[challenge],
+          isYou: false,
+          isDemo: true,
+        }))
+  const realEntries: LeaderboardEntry[] = realMembers.map((m) => ({
+    id: m.userId,
+    name: m.name,
+    avatar: m.avatar,
+    value: m.value,
     isYou: false,
-    isDemo: true,
+    isDemo: false,
   }))
   const you: LeaderboardEntry = {
     id: 'you',
@@ -94,7 +121,7 @@ export function buildLeaderboard(
     isYou: true,
     isDemo: false,
   }
-  return [...demoEntries, you].sort((a, b) => b.value - a.value)
+  return [...demoEntries, ...realEntries, you].sort((a, b) => b.value - a.value)
 }
 
 // ---------------------------------------------------------------------------

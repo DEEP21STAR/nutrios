@@ -371,7 +371,9 @@ export default function App() {
         </>
       )}
 
-      {activeTab === 'together' && <TogetherMode meals={meals} goals={goals ?? DEFAULT_GOALS} avatarUrl={avatarUrl} />}
+      {activeTab === 'together' && (
+        <TogetherMode meals={meals} goals={goals ?? DEFAULT_GOALS} avatarUrl={avatarUrl} userId={userId} />
+      )}
 
       {/* mt-auto pins this to the bottom of the flex column regardless of how tall each tab's
           own content is — without it, a short tab (e.g. Today with no meals logged) leaves the
