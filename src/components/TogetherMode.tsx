@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { Goals, Meal } from '@/lib/types'
 import { cn } from '@/lib/utils'
+import { isPhotoAvatar } from '@/components/AvatarPicker'
 import {
   buildLeaderboard,
   CHALLENGES,
@@ -10,6 +11,27 @@ import {
   type LeaderboardEntry,
   type ShareLevel,
 } from '@/lib/togetherDemo'
+
+/** Real uploaded photos render as a circular image; demo/default entries stay emoji, same as
+ * before — one shared spot so PodiumSlot and LeaderboardRow can't drift out of sync. */
+function AvatarBadge({ avatar, size }: { avatar: string; size: number }) {
+  if (isPhotoAvatar(avatar)) {
+    return (
+      <img
+        src={avatar}
+        alt=""
+        aria-hidden
+        className="shrink-0 rounded-full object-cover"
+        style={{ width: size, height: size }}
+      />
+    )
+  }
+  return (
+    <span className="shrink-0 text-center" style={{ fontSize: size * 0.75, lineHeight: `${size}px`, width: size }} aria-hidden>
+      {avatar}
+    </span>
+  )
+}
 
 const PODIUM_COLORS = ['#ffd700', '#c0c0c0', '#cd7f32'] // gold, silver, bronze
 
@@ -25,14 +47,22 @@ const PODIUM_COLORS = ['#ffd700', '#c0c0c0', '#cd7f32'] // gold, silver, bronze
  * (bottom of the DEMO_FRIENDS list in togetherDemo.ts, tagged isYou/isDemo:false) is computed
  * from your real logged meals.
  */
-export function TogetherMode({ meals, goals }: { meals: Meal[]; goals: Goals }) {
+export function TogetherMode({
+  meals,
+  goals,
+  avatarUrl,
+}: {
+  meals: Meal[]
+  goals: Goals
+  avatarUrl?: string | null
+}) {
   const [settings, setSettings] = useState(loadTogetherSettings)
   const [challenge, setChallenge] = useState<ChallengeType>('consistency')
   const [bannerDismissed, setBannerDismissed] = useState(false)
 
   const leaderboard = useMemo(
-    () => buildLeaderboard(challenge, meals, goals, settings.displayName),
-    [challenge, meals, goals, settings.displayName],
+    () => buildLeaderboard(challenge, meals, goals, settings.displayName, avatarUrl),
+    [challenge, meals, goals, settings.displayName, avatarUrl],
   )
 
   const visibleLeaderboard =
@@ -125,9 +155,7 @@ function PodiumSlot({ entry, rank, unit }: { entry: LeaderboardEntry; rank: numb
   const height = rank === 1 ? 96 : rank === 2 ? 76 : 60
   return (
     <div className="flex flex-col items-center gap-1" style={{ width: 84 }}>
-      <span className="text-2xl" aria-hidden>
-        {entry.avatar}
-      </span>
+      <AvatarBadge avatar={entry.avatar} size={32} />
       <span className={cn('truncate text-caption', entry.isYou ? 'font-semibold text-accent-health' : 'text-text-secondary')} style={{ maxWidth: 84 }}>
         {entry.name}
       </span>
@@ -161,9 +189,7 @@ function LeaderboardRow({ entry, rank, unit }: { entry: LeaderboardEntry; rank: 
       )}
     >
       <span className="w-5 shrink-0 text-center text-caption text-text-tertiary">{rank}</span>
-      <span className="text-lg" aria-hidden>
-        {entry.avatar}
-      </span>
+      <AvatarBadge avatar={entry.avatar} size={24} />
       <span className={cn('min-w-0 flex-1 truncate text-body', entry.isYou ? 'font-semibold text-accent-health' : 'text-text-secondary')}>
         {entry.name}
       </span>

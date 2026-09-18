@@ -66,6 +66,46 @@
   --space-6: 48px;
 }
 
+/*
+ * Light theme — real, separate palette (not an auto-invert). NUTRIOS's "Cinematic Tech" identity
+ * is dark-first by design, so this isn't trying to out-cinematic the dark mode; it's a genuinely
+ * usable, legible light alternative for whoever wants it. Applied via `data-theme="light"` on
+ * <html> (see lib/theme.ts) rather than a prefers-color-scheme media query, since this is a
+ * user-chosen in-app setting, not following the OS.
+ */
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  --color-bg-primary: #f7f7fa;
+  --color-bg-secondary: #ececf1;
+  --color-bg-tertiary: #e1e1e8;
+
+  --color-accent-health: #00966b; /* deepened from #00e5a0 for contrast on a light ground */
+  --color-accent-energy: #b8790a;
+  --color-accent-ai: #6d3fd1;
+  --color-accent-danger: #d6293b;
+
+  --color-text-primary: #14141a;
+  --color-text-secondary: rgb(20 20 26 / 72%);
+  --color-text-tertiary: rgb(20 20 26 / 48%);
+  --color-text-muted: rgb(20 20 26 / 24%);
+
+  --glow-health: rgba(0, 150, 107, 0.25);
+  --glow-energy: rgba(184, 121, 10, 0.25);
+  --glow-ai: rgba(109, 63, 209, 0.3);
+  --glow-danger: rgba(214, 41, 59, 0.25);
+
+  --bg-glass: rgba(255, 255, 255, 0.72);
+  --glass-border: rgba(20, 20, 26, 0.08);
+  --glass-highlight: linear-gradient(135deg, rgba(20, 20, 26, 0.06), transparent 50%);
+}
+/* Starfield only makes sense against the dark ground it was designed for — see index.html's
+   canvas script, which reads this same attribute and skips drawing entirely in light mode
+   rather than rendering dark specks on a white background. */
+:root[data-theme='light'] #starfield {
+  display: none;
+}
+
 html,
 body,
 #root {
@@ -231,7 +271,10 @@ body,
   border-top: 1px solid rgb(16 216 255 / 15%);
   padding: 22px 24px 20px;
   text-align: center;
-  margin-top: 32px;
+  /* No margin-top here on purpose — this component is pinned to the bottom of a flex column via
+     the caller's own className (e.g. NUTRIOS passes "mt-auto"), and a hardcoded margin here
+     would fight that same property and win by source order, silently breaking the pin. Callers
+     not using flex-push spacing should pass their own top-margin className instead. */
 }
 .wfd-logo {
   font-size: 24px;

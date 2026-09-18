@@ -4,11 +4,31 @@ import { VitePWA } from 'vite-plugin-pwa'
 import { defineConfig } from 'vite'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import { execSync } from 'child_process'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
+// Real build identifier, not a hand-maintained version string: commit count as an
+// incrementing build number (same convention as Android's versionCode) + the short hash for
+// precision. Falls back honestly if git isn't available (e.g. a tarball build with no .git) —
+// never fakes a number.
+function getBuildInfo() {
+  try {
+    const buildNumber = execSync('git rev-list --count HEAD', { cwd: __dirname }).toString().trim()
+    const commitHash = execSync('git rev-parse --short HEAD', { cwd: __dirname }).toString().trim()
+    return { buildNumber, commitHash }
+  } catch {
+    return { buildNumber: 'unknown', commitHash: 'unknown' }
+  }
+}
+const { buildNumber, commitHash } = getBuildInfo()
+
 // https://vite.dev/config/
 export default defineConfig({
+  define: {
+    __BUILD_NUMBER__: JSON.stringify(buildNumber),
+    __COMMIT_HASH__: JSON.stringify(commitHash),
+  },
   // Served as a GitHub Pages project site at deep21star.github.io/nutrios/,
   // not the domain root — every asset/manifest path needs this prefix or
   // the built JS/CSS 404s in production.
@@ -31,7 +51,7 @@ export default defineConfig({
         icons: [
           { src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png' },
           { src: 'pwa-512x512.png', sizes: '512x512', type: 'image/png' },
-          { src: 'pwa-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+          { src: 'pwa-512x512-maskable.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
         ],
       },
       workbox: {

@@ -14,6 +14,9 @@ import { TabBar, type TabKey } from '@/components/TabBar'
 import { WhetuFooter } from '@/components/WhetuFooter'
 import { SplashScreen } from '@/components/SplashScreen'
 import { OnboardingWizard } from '@/components/OnboardingWizard'
+import { SettingsPanel } from '@/components/SettingsPanel'
+import { useRegisterSW } from 'virtual:pwa-register/react'
+import { getStoredTheme, applyTheme, type Theme } from '@/lib/theme'
 import { identifyFoodViaOllama } from '@/lib/ollamaVision'
 import { identifyFoodViaGemini } from '@/lib/geminiVision'
 import { identifyFoodOnDevice, isWebGPUAvailable, type OnDeviceProgress } from '@/lib/onDeviceVision'
@@ -23,6 +26,7 @@ import { fireConfetti } from '@/lib/confetti'
 import { ensureAuthenticated } from '@/lib/auth'
 import { insertMeal, listTodayMeals, subscribeToMeals } from '@/lib/mealsRepo'
 import { fetchGoals, saveGoals } from '@/lib/goalsRepo'
+import { fetchAvatarUrl } from '@/lib/avatarRepo'
 import { sumMacros, DEFAULT_GOALS, type FoodItem, type Goals, type Meal } from '@/lib/types'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 
@@ -60,6 +64,36 @@ export default function App() {
   // placeholder while this resolves, never persisted or shown as if it were the real target.
   const [goals, setGoals] = useState<Goals | null>(null)
   const [needsOnboarding, setNeedsOnboarding] = useState(false)
+  const [theme, setTheme] = useState<Theme>('dark')
+  const [showSettings, setShowSettings] = useState(false)
+  const [swRegistration, setSwRegistration] = useState<ServiceWorkerRegistration | undefined>(undefined)
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+
+  const { needRefresh: [needRefresh], updateServiceWorker } = useRegisterSW({
+    onRegisteredSW(_url, registration) {
+      setSwRegistration(registration)
+    },
+  })
+
+  // Theme is a user preference, not app data — apply the stored choice once on mount, same
+  // pattern as any other localStorage-backed setting (independent of the Supabase auth bootstrap
+  // below, since it has to work identically for a brand-new user who hasn't onboarded yet).
+  useEffect(() => {
+    const stored = getStoredTheme()
+    applyTheme(stored)
+    setTheme(stored)
+  }, [])
+
+  async function handleCheckForUpdates(): Promise<boolean> {
+    if (!swRegistration) return false
+    const before = swRegistration.waiting
+    await swRegistration.update()
+    // A genuinely new SW starts installing asynchronously after update() resolves; give it a
+    // moment rather than reading swRegistration.waiting synchronously, which would always be
+    // whatever was already there (or nothing) before the update check had a chance to run.
+    await new Promise((r) => setTimeout(r, 1000))
+    return swRegistration.waiting !== before && swRegistration.waiting != null
+  }
 
   // Bootstrap: real Supabase anonymous auth + real meals load + real
   // realtime subscription for cross-device sync. No mock data anywhere in
@@ -92,6 +126,10 @@ export default function App() {
         } else {
           setNeedsOnboarding(true)
         }
+
+        const savedAvatar = await fetchAvatarUrl(user.id)
+        if (cancelled) return
+        setAvatarUrl(savedAvatar)
       } catch (err) {
         if (!cancelled) setAuthError(err instanceof Error ? err.message : 'Supabase sign-in failed.')
       }
@@ -266,7 +304,7 @@ export default function App() {
   }
 
   return (
-    <div className="relative z-10 mx-auto min-h-screen max-w-md overflow-x-hidden pb-40 text-text-primary">
+    <div className="relative z-10 mx-auto flex min-h-screen max-w-md flex-col overflow-x-hidden pb-40 text-text-primary">
       {/* Ambient background glow — subtle, static, sits behind everything. Starfield canvas
           (index.html) now shows through here — Phase 1's "no particles" scope was revised. */}
       <div
@@ -276,12 +314,36 @@ export default function App() {
       />
 
       <header className="relative p-4 text-center">
+        <button
+          onClick={() => setShowSettings(true)}
+          aria-label="Settings"
+          className="absolute right-4 top-4 text-text-tertiary"
+        >
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+            <circle cx="12" cy="12" r="3.2" />
+            <path d="M19.4 13a7.6 7.6 0 0 0 0-2l2-1.5-2-3.4-2.4.6a7.6 7.6 0 0 0-1.7-1l-.3-2.5H9l-.3 2.5a7.6 7.6 0 0 0-1.7 1l-2.4-.6-2 3.4L4.6 11a7.6 7.6 0 0 0 0 2l-2 1.5 2 3.4 2.4-.6a7.6 7.6 0 0 0 1.7 1l.3 2.5h6l.3-2.5a7.6 7.6 0 0 0 1.7-1l2.4.6 2-3.4-2-1.5Z" />
+          </svg>
+        </button>
         <h1 className="text-title">
           {activeTab === 'today' ? 'Today' : activeTab === 'progress' ? 'Progress' : 'Together'}
         </h1>
         {authError && <p className="mt-1 text-caption text-accent-danger">{authError}</p>}
         {statusMessage && <p className="mt-1 text-caption text-text-tertiary">{statusMessage}</p>}
       </header>
+
+      {showSettings && (
+        <SettingsPanel
+          onClose={() => setShowSettings(false)}
+          theme={theme}
+          onThemeChange={setTheme}
+          needRefresh={needRefresh}
+          onUpdate={() => updateServiceWorker(true)}
+          onCheckForUpdates={handleCheckForUpdates}
+          userId={userId}
+          avatarUrl={avatarUrl}
+          onAvatarChange={setAvatarUrl}
+        />
+      )}
 
       {/* Tabbed layout (2026-09-17) — was one continuous scroll through every section
           regardless of what the user actually came here to do. Each tab below is exactly the
@@ -309,9 +371,14 @@ export default function App() {
         </>
       )}
 
-      {activeTab === 'together' && <TogetherMode meals={meals} goals={goals ?? DEFAULT_GOALS} />}
+      {activeTab === 'together' && <TogetherMode meals={meals} goals={goals ?? DEFAULT_GOALS} avatarUrl={avatarUrl} />}
 
-      <WhetuFooter />
+      {/* mt-auto pins this to the bottom of the flex column regardless of how tall each tab's
+          own content is — without it, a short tab (e.g. Today with no meals logged) leaves the
+          footer stranded mid-page with a big dead gap before the fixed camera/tab-bar clearance
+          below (real bug, caught from a live screenshot: looked like the footer "wasn't at the
+          bottom" even though it was technically the last DOM child). */}
+      <WhetuFooter className="mt-auto" />
 
       <InputOrbButton onClick={() => setStage('mode-select')} />
       <TabBar active={activeTab} onChange={setActiveTab} />

@@ -1,13 +1,15 @@
 /**
- * Whetū Digital trademark footer — same wordmark + 3D tilt animation as the
- * live Clarity dashboard, tinted to NUTRIOS's own emerald/violet tokens
- * (see the .wfd-* rules in index.css for the ported animation itself).
+ * Whetū Digital trademark footer — same wordmark, 3D tilt animation, and
+ * real brand colors (cyan/purple) as the live Clarity dashboard (see the
+ * .wfd-* rules in index.css for the ported animation itself). This is the
+ * company brand mark, not an app-themed element, so it deliberately does
+ * NOT use NUTRIOS's own emerald/violet tokens.
  * NUTRIOS has no third-party client the way Clarity (Mimi) or Voyager
  * (Sachind) do, so the "built with care for" line reads generically.
  */
-export function WhetuFooter() {
+export function WhetuFooter({ className }: { className?: string }) {
   return (
-    <div className="wfd-footer">
+    <div className={`wfd-footer ${className ?? ''}`}>
       <div className="wfd-logo">WHETŪ DIGITAL</div>
       <div className="wfd-tagline">Digital Tools for Modern Living — Aotearoa New Zealand</div>
       <div className="wfd-copy">

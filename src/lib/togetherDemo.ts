@@ -75,6 +75,7 @@ export function buildLeaderboard(
   meals: Meal[],
   goals: Goals,
   yourDisplayName: string,
+  yourAvatar?: string | null,
 ): LeaderboardEntry[] {
   const yourValue = computeYourChallengeValue(challenge, meals, goals)
   const demoEntries: LeaderboardEntry[] = DEMO_FRIENDS.map((f) => ({
@@ -88,7 +89,7 @@ export function buildLeaderboard(
   const you: LeaderboardEntry = {
     id: 'you',
     name: yourDisplayName.trim() || 'You',
-    avatar: '🙂',
+    avatar: yourAvatar ?? '🙂',
     value: yourValue,
     isYou: true,
     isDemo: false,
