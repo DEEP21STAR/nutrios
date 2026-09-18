@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import gsap from 'gsap'
 import { SPLASH_CATEGORIES } from '@/lib/splashCategories'
+import { playBrandChime } from '@/lib/chime'
 
 const INTRO_SEEN_KEY = 'nutrios.introSeen.v1'
 
@@ -125,6 +126,7 @@ export function SplashScreen({ onDone }: { onDone: () => void }) {
     }
 
     tl.set(wordmarkRef.current, { opacity: 1 })
+    tl.call(() => playBrandChime())
     const popTargets = [...letterRefs.current, ringWrapRef.current, sRef.current]
     tl.fromTo(
       popTargets,

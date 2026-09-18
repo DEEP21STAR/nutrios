@@ -3,7 +3,11 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- interactive-widget=resizes-content: on Chrome/Android, the on-screen keyboard shrinks
+         the actual viewport instead of just the visual one, so `fixed`/`sticky` bottom UI (the
+         onboarding wizard's Continue button) stays above the keyboard instead of hiding behind
+         it until the keyboard is dismissed. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content" />
     <meta name="theme-color" content="#0A0A0F" />
     <title>NUTRIOS</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />

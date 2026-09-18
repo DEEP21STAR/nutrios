@@ -250,8 +250,12 @@ function NumberField({
       <input
         type="number"
         inputMode="decimal"
+        enterKeyHint="done"
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') e.currentTarget.blur()
+        }}
         placeholder={placeholder}
         className="flex-1 bg-transparent text-body text-text-primary outline-none placeholder:text-text-tertiary"
       />
