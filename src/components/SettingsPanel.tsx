@@ -32,6 +32,17 @@ export function SettingsPanel({
   onAvatarChange,
 }: SettingsPanelProps) {
   const [checkState, setCheckState] = useState<'idle' | 'checking' | 'up-to-date'>('idle')
+  // Every setting here applies instantly (no explicit Save action) — that's correct behavior,
+  // but tapping something and seeing nothing happen looks exactly like it silently failed. This
+  // toast is the fix: real, if quiet, confirmation instead of just trusting the selected-border
+  // state to be noticed. Real user report (2026-09-18): "when you go back, it doesn't change
+  // anything" — the change WAS saved (verified against the live site), the feedback just wasn't
+  // visible enough to register as "this worked."
+  const [toast, setToast] = useState<string | null>(null)
+  function flashToast(text: string) {
+    setToast(text)
+    setTimeout(() => setToast(null), 1600)
+  }
 
   async function handleCheck() {
     setCheckState('checking')
@@ -53,7 +64,14 @@ export function SettingsPanel({
         {userId && (
           <section className="glass-card flex flex-col gap-3 p-4">
             <h3 className="text-body font-semibold">Profile</h3>
-            <AvatarPicker userId={userId} avatarUrl={avatarUrl} onChange={onAvatarChange} />
+            <AvatarPicker
+              userId={userId}
+              avatarUrl={avatarUrl}
+              onChange={(avatar) => {
+                onAvatarChange(avatar)
+                flashToast('Profile picture saved')
+              }}
+            />
           </section>
         )}
 
@@ -66,6 +84,7 @@ export function SettingsPanel({
                 onClick={() => {
                   applyTheme(opt)
                   onThemeChange(opt)
+                  flashToast(`${opt === 'light' ? 'Light' : 'Dark'} theme saved`)
                 }}
                 className={`rounded-xl border px-4 py-3 text-body capitalize transition-colors ${
                   theme === opt
@@ -107,6 +126,14 @@ export function SettingsPanel({
           )}
         </section>
       </div>
+
+      {toast && (
+        <div className="pointer-events-none fixed inset-x-0 bottom-8 z-20 flex justify-center px-4">
+          <span className="rounded-full bg-accent-health px-4 py-2 text-caption font-semibold text-bg-primary shadow-lg">
+            ✓ {toast}
+          </span>
+        </div>
+      )}
     </div>
   )
 }
