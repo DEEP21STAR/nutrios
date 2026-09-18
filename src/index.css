@@ -29,6 +29,9 @@
   /* Typography families */
   --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', monospace;
+  /* Wordmark only — the NUTRIOS logotype, not general UI text. A real display face with
+     character (angular, tech-native) instead of reusing Inter bold, which read as generic. */
+  --font-display: 'Chakra Petch', var(--font-sans);
 
   /* Radius scale (spec: sm/md/lg/xl/full) — overrides Tailwind defaults on purpose */
   --radius-sm: 8px;

@@ -295,16 +295,20 @@ export default function App() {
     }
   }
 
-  if (showSplash) {
-    return <SplashScreen onDone={() => setShowSplash(false)} />
-  }
-
-  if (needsOnboarding) {
-    return <OnboardingWizard onComplete={handleOnboardingComplete} />
-  }
-
+  // The splash renders as an overlay ALONGSIDE whichever real screen is underneath (onboarding
+  // or the main app), not as an early return replacing it — the iris-wipe reveal animation
+  // needs the real content already mounted and painted behind it to actually reveal, rather
+  // than just cutting to a blank moment before the real screen mounts. Deliberately NOT
+  // extracted into a nested component function (a real, easy-to-miss anti-pattern) — that would
+  // redefine a new component type on every App render, remounting the whole tree (and every
+  // child's own internal state, e.g. mid-capture UI) any time meals/goals/etc. change.
   return (
-    <div className="relative z-10 mx-auto flex min-h-screen max-w-md flex-col overflow-x-hidden pb-40 text-text-primary">
+    <>
+      {showSplash && <SplashScreen onDone={() => setShowSplash(false)} />}
+      {needsOnboarding ? (
+        <OnboardingWizard onComplete={handleOnboardingComplete} />
+      ) : (
+        <div className="relative z-10 mx-auto flex min-h-screen max-w-md flex-col overflow-x-hidden pb-40 text-text-primary">
       {/* Ambient background glow — subtle, static, sits behind everything. Starfield canvas
           (index.html) now shows through here — Phase 1's "no particles" scope was revised. */}
       <div
@@ -449,7 +453,9 @@ export default function App() {
           <p className="text-body text-accent-health motion-safe:animate-pulse">Saving to Supabase…</p>
         </div>
       )}
-    </div>
+        </div>
+        )}
+    </>
   )
 }
 
