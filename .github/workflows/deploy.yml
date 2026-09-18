@@ -30,6 +30,16 @@ jobs:
       # verified locally that `vite build` produces an identical dist/ with scripts skipped.
       - run: npm ci --ignore-scripts
       - run: npm run build
+        env:
+          # Vite bakes these into the client bundle at build time — .env.local (used for local
+          # dev) is correctly gitignored and never reaches this runner, so without these the
+          # production build silently ships with no Supabase connection at all (real bug hit and
+          # fixed 2026-09-18: "supabaseUrl is required" on the live site). Both are the public
+          # anon/publishable key + project URL, safe to expose client-side by Supabase's own
+          # design (protected by RLS, not secrecy) — stored as repo secrets purely for
+          # convenience, not because they're sensitive.
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
