@@ -33,6 +33,16 @@ const SMILE_MS = 500
 const HOLD_2_MS = 400 // beat on the smile before the zoom
 const ZOOM_MS = 550
 
+// Brand stamp — Deep's real report: on first run, the category tour plays for several seconds
+// before the logo ever appears, so the brand isn't actually visible until the very end. This is
+// a quick, distinct "stamp" (just the ring mark, no wordmark text) shown for a beat BEFORE the
+// tour starts, bookending the splash with the brand instead of only closing on it. Deliberately
+// not a second full wordmark reveal — that would just repeat the finale rather than read as its
+// own moment, the same "Netflix ta-dum, then the real content" idea Deep referenced earlier.
+const INTRO_STAMP_ENTER = 0.35
+const INTRO_STAMP_HOLD = 0.5
+const INTRO_STAMP_EXIT = 0.3
+
 /**
  * Real 100°-wide bottom arc of the same ring (r=38, center 50,50) the "O" circle already uses —
  * computed directly (θ=35°..145° through the bottom, sweep-flag 1 for the clockwise/y-down
@@ -64,6 +74,7 @@ const SMILE_ARC_D = 'M 81.13 71.80 A 38 38 0 0 1 18.87 71.80'
  */
 export function SplashScreen({ onDone }: { onDone: () => void }) {
   const rootRef = useRef<HTMLDivElement>(null)
+  const introStampRef = useRef<HTMLDivElement>(null)
   const categoryRefs = useRef<(HTMLDivElement | null)[]>([])
   const particleRefs = useRef<(HTMLDivElement | null)[]>([])
   const dotRefs = useRef<(HTMLDivElement | null)[]>([])
@@ -92,8 +103,9 @@ export function SplashScreen({ onDone }: { onDone: () => void }) {
     }
 
     const categoryTotal = isFirstRun ? SPLASH_CATEGORIES.length * CATEGORY_BEAT : 0
+    const introStampTotal = isFirstRun ? INTRO_STAMP_ENTER + INTRO_STAMP_HOLD + INTRO_STAMP_EXIT : 0
     const totalEstimateMs =
-      (categoryTotal + WORDMARK_ENTER_TOTAL) * 1000 +
+      (introStampTotal + categoryTotal + WORDMARK_ENTER_TOTAL) * 1000 +
       HOLD_1_MS +
       TAGLINE_OUT_MS +
       SMILE_MS +
@@ -122,6 +134,15 @@ export function SplashScreen({ onDone }: { onDone: () => void }) {
     tlRef.current = tl
 
     if (isFirstRun) {
+      tl.call(() => playBrandChime())
+      tl.fromTo(
+        introStampRef.current,
+        { opacity: 0, scale: 0.5 },
+        { opacity: 1, scale: 1, duration: INTRO_STAMP_ENTER, ease: 'back.out(2.2)' },
+      )
+      tl.to({}, { duration: INTRO_STAMP_HOLD })
+      tl.to(introStampRef.current, { opacity: 0, scale: 0.8, duration: INTRO_STAMP_EXIT, ease: 'power1.in' })
+
       SPLASH_CATEGORIES.forEach((cat, i) => {
         const el = categoryRefs.current[i]
         const dot = dotRefs.current[i]
@@ -219,6 +240,17 @@ export function SplashScreen({ onDone }: { onDone: () => void }) {
           'radial-gradient(ellipse 70% 55% at 50% 42%, rgb(0 229 160 / 0.14) 0%, rgb(139 92 246 / 0.07) 45%, transparent 75%)',
       }}
     >
+      <div
+        ref={introStampRef}
+        aria-hidden
+        className="absolute z-10 flex items-center justify-center"
+        style={{ opacity: 0, width: 72, height: 72 }}
+      >
+        <svg viewBox="0 0 100 100" style={{ width: '100%', height: '100%', filter: `drop-shadow(0 0 18px ${RING_COLOR})` }}>
+          <circle cx="50" cy="50" r="38" fill="none" stroke={RING_COLOR} strokeWidth="9" />
+        </svg>
+      </div>
+
       <div className="relative flex h-[40vh] w-full items-center justify-center">
         {SPLASH_CATEGORIES.map((cat, i) => {
           const Icon = cat.Icon

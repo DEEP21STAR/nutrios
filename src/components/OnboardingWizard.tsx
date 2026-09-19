@@ -3,8 +3,16 @@ import { TodayRing } from '@/components/TodayRing'
 import { calculateGoals, type ActivityLevel, type GoalDirection, type OnboardingAnswers, type Sex } from '@/lib/bmr'
 import type { Goals } from '@/lib/types'
 
-const STEPS = ['name', 'sex', 'age', 'height', 'weight', 'target', 'activity', 'goal', 'review'] as const
+const STEPS = ['welcome', 'name', 'sex', 'age', 'height', 'weight', 'target', 'activity', 'goal', 'review'] as const
 type Step = (typeof STEPS)[number]
+
+// Gendered personalization (Deep's real request) — once a sex is picked, every step after it
+// (age onward, including the progress bar and Continue button) picks up this accent instead of
+// the default emerald, so the rest of onboarding reads as personalized rather than generic.
+// Welcome/name/sex themselves stay the neutral default since there's nothing to personalize yet.
+const MALE_COLOR = '#3b9dff'
+const FEMALE_COLOR = '#ff5ea8'
+const DEFAULT_COLOR = 'var(--color-accent-health)'
 
 const ACTIVITY_OPTIONS: { value: ActivityLevel; label: string; hint: string }[] = [
   { value: 'sedentary', label: 'Sedentary', hint: 'Little or no exercise' },
@@ -36,6 +44,7 @@ export function OnboardingWizard({ onComplete }: { onComplete: (goals: Goals, na
 
   const step: Step = STEPS[stepIndex]
   const progressPct = ((stepIndex + 1) / STEPS.length) * 100
+  const themeColor = sex ? (sex === 'male' ? MALE_COLOR : FEMALE_COLOR) : DEFAULT_COLOR
 
   const weightNum = parseFloat(weightKg)
   const targetWeightNum = parseFloat(targetWeightKg)
@@ -73,6 +82,7 @@ export function OnboardingWizard({ onComplete }: { onComplete: (goals: Goals, na
   }
 
   const canAdvance: Record<Step, boolean> = {
+    welcome: true,
     // Skippable on purpose — WhetuFooter already falls back to "you" when this is blank, so a
     // name shouldn't gate access to the rest of onboarding the way the BMR-required fields do.
     name: true,
@@ -91,8 +101,8 @@ export function OnboardingWizard({ onComplete }: { onComplete: (goals: Goals, na
       <div className="glass sticky top-0 z-10 flex flex-col gap-2 px-4 pt-[calc(env(safe-area-inset-top,0px)+12px)] pb-3">
         <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10">
           <div
-            className="h-full rounded-full bg-accent-health transition-[width] duration-300 ease-out"
-            style={{ width: `${progressPct}%`, boxShadow: '0 0 12px 1px var(--glow-health)' }}
+            className="h-full rounded-full transition-[width,background-color] duration-300 ease-out"
+            style={{ width: `${progressPct}%`, background: themeColor, boxShadow: `0 0 12px 1px ${themeColor}` }}
           />
         </div>
         <p className="text-caption text-text-tertiary">
@@ -101,6 +111,24 @@ export function OnboardingWizard({ onComplete }: { onComplete: (goals: Goals, na
       </div>
 
       <div className="mx-4 mt-6 flex flex-1 flex-col">
+        {step === 'welcome' && (
+          <div className="flex flex-1 flex-col items-center justify-center gap-4 text-center">
+            <div
+              className="grid h-16 w-16 place-items-center rounded-full"
+              style={{ background: 'rgb(0 229 160 / 0.12)', boxShadow: '0 0 24px 4px var(--glow-health)' }}
+            >
+              <span className="text-3xl" aria-hidden>
+                🎯
+              </span>
+            </div>
+            <h1 className="text-title">Let's set your goals</h1>
+            <p className="max-w-xs text-body text-text-tertiary">
+              A few quick questions — your age, weight, and activity level — and NUTRYOS builds a
+              real daily calorie and macro target just for you.
+            </p>
+          </div>
+        )}
+
         {step === 'name' && (
           <StepCard title="What should we call you?" subtitle="Shows up in the little signature at the bottom of your screen — totally optional.">
             <input
@@ -120,38 +148,39 @@ export function OnboardingWizard({ onComplete }: { onComplete: (goals: Goals, na
         )}
 
         {step === 'sex' && (
-          <StepCard title="Let's personalize your plan" subtitle="This helps us calculate your real daily energy needs.">
+          <StepCard title="Let's personalize your plan" subtitle="This helps us calculate your real daily energy needs — and colors the rest of setup just for you.">
             <div className="grid grid-cols-2 gap-3">
-              {(['male', 'female'] as const).map((opt) => (
-                <ChoiceButton key={opt} selected={sex === opt} onClick={() => setSex(opt)}>
-                  {opt === 'male' ? 'Male' : 'Female'}
-                </ChoiceButton>
-              ))}
+              <ChoiceButton selected={sex === 'male'} onClick={() => setSex('male')} color={MALE_COLOR}>
+                Male
+              </ChoiceButton>
+              <ChoiceButton selected={sex === 'female'} onClick={() => setSex('female')} color={FEMALE_COLOR}>
+                Female
+              </ChoiceButton>
             </div>
           </StepCard>
         )}
 
         {step === 'age' && (
           <StepCard title="How old are you?" subtitle="Metabolism shifts with age — this keeps your target accurate.">
-            <NumberField value={age} onChange={setAge} placeholder="Age" suffix="years" />
+            <NumberField value={age} onChange={setAge} placeholder="Age" suffix="years" color={themeColor} />
           </StepCard>
         )}
 
         {step === 'height' && (
           <StepCard title="How tall are you?" subtitle="Used in the same formula as your doctor's BMR calculation.">
-            <NumberField value={heightCm} onChange={setHeightCm} placeholder="Height" suffix="cm" />
+            <NumberField value={heightCm} onChange={setHeightCm} placeholder="Height" suffix="cm" color={themeColor} />
           </StepCard>
         )}
 
         {step === 'weight' && (
           <StepCard title="What's your current weight?" subtitle="Just an estimate is fine — you can always adjust later.">
-            <NumberField value={weightKg} onChange={setWeightKg} placeholder="Weight" suffix="kg" />
+            <NumberField value={weightKg} onChange={setWeightKg} placeholder="Weight" suffix="kg" color={themeColor} />
           </StepCard>
         )}
 
         {step === 'target' && (
           <StepCard title="What's your target weight?" subtitle="Same number as now is fine if you just want to maintain.">
-            <NumberField value={targetWeightKg} onChange={setTargetWeightKg} placeholder="Target weight" suffix="kg" />
+            <NumberField value={targetWeightKg} onChange={setTargetWeightKg} placeholder="Target weight" suffix="kg" color={themeColor} />
           </StepCard>
         )}
 
@@ -159,7 +188,7 @@ export function OnboardingWizard({ onComplete }: { onComplete: (goals: Goals, na
           <StepCard title="How active are you?" subtitle="Outside of intentional workouts — your typical week.">
             <div className="flex flex-col gap-2">
               {ACTIVITY_OPTIONS.map((opt) => (
-                <ChoiceButton key={opt.value} selected={activityLevel === opt.value} onClick={() => setActivityLevel(opt.value)}>
+                <ChoiceButton key={opt.value} selected={activityLevel === opt.value} onClick={() => setActivityLevel(opt.value)} color={themeColor}>
                   <div className="text-left">
                     <div>{opt.label}</div>
                     <div className="text-caption text-text-tertiary">{opt.hint}</div>
@@ -182,7 +211,7 @@ export function OnboardingWizard({ onComplete }: { onComplete: (goals: Goals, na
             {impliedDirection !== 'maintain' && (
               <div className="flex flex-col gap-2">
                 {[0.25, 0.5, 0.75, 1].map((rate) => (
-                  <ChoiceButton key={rate} selected={goalRate === rate} onClick={() => setGoalRate(rate)}>
+                  <ChoiceButton key={rate} selected={goalRate === rate} onClick={() => setGoalRate(rate)} color={themeColor}>
                     {rate} kg / week {rate <= 0.5 ? '(steady, recommended)' : rate >= 1 ? '(aggressive)' : ''}
                   </ChoiceButton>
                 ))}
@@ -212,7 +241,8 @@ export function OnboardingWizard({ onComplete }: { onComplete: (goals: Goals, na
         <button
           onClick={() => (step === 'review' ? computedGoals && onComplete(computedGoals, name.trim()) : next())}
           disabled={!canAdvance[step]}
-          className="flex-1 rounded-xl bg-accent-health py-3 text-body font-semibold text-bg-primary disabled:opacity-30"
+          className="flex-1 rounded-xl py-3 text-body font-semibold text-bg-primary transition-colors disabled:opacity-30"
+          style={{ background: themeColor, boxShadow: `0 0 20px -4px ${themeColor}` }}
         >
           {step === 'review' ? 'Start using NUTRYOS' : 'Continue'}
         </button>
@@ -237,19 +267,22 @@ function ChoiceButton({
   selected,
   onClick,
   children,
+  color = 'var(--color-accent-health)',
 }: {
   selected: boolean
   onClick: () => void
   children: React.ReactNode
+  color?: string
 }) {
   return (
     <button
       onClick={onClick}
-      className={`rounded-xl border px-4 py-3 text-body transition-colors ${
+      className="rounded-xl border px-4 py-3 text-body transition-colors"
+      style={
         selected
-          ? 'border-accent-health bg-accent-health/10 text-text-primary'
-          : 'border-white/10 bg-bg-secondary text-text-secondary'
-      }`}
+          ? { borderColor: color, background: `color-mix(in srgb, ${color} 12%, transparent)`, color: 'var(--color-text-primary)' }
+          : { borderColor: 'rgb(255 255 255 / 0.1)', background: 'var(--color-bg-secondary)', color: 'var(--color-text-secondary)' }
+      }
     >
       {children}
     </button>
@@ -261,20 +294,28 @@ function NumberField({
   onChange,
   placeholder,
   suffix,
+  color = 'var(--color-accent-health)',
 }: {
   value: string
   onChange: (v: string) => void
   placeholder: string
   suffix: string
+  color?: string
 }) {
+  const [focused, setFocused] = useState(false)
   return (
-    <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-bg-secondary px-4 py-3">
+    <div
+      className="flex items-center gap-2 rounded-xl border bg-bg-secondary px-4 py-3 transition-colors"
+      style={{ borderColor: focused ? color : 'rgb(255 255 255 / 0.1)' }}
+    >
       <input
         type="number"
         inputMode="decimal"
         enterKeyHint="done"
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
         onKeyDown={(e) => {
           if (e.key === 'Enter') e.currentTarget.blur()
         }}
