@@ -20,6 +20,7 @@ export function WhetuFooter({ className, name }: { className?: string; name?: st
         Built with care for <span className="wfd-name">{name?.trim() || 'you'}</span>{' '}
         <span className="wfd-heart">♥</span>
       </span>
+      <span className="wfd-badge">NUTRYOS · Whetū Digital {new Date().getFullYear()}</span>
     </div>
   )
 }
