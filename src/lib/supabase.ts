@@ -13,4 +13,26 @@ import { createClient } from '@supabase/supabase-js'
  * (`sb_secret_...`) was deliberately never shared with this session and is
  * never used here; this app has no server component.
  */
-export const supabase = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY)
+/**
+ * Real, observed-in-production error (not theoretical): PostgREST occasionally rejects a
+ * freshly-minted anonymous JWT with `PGRST303 "JWT issued at future"` — a genuine clock-skew gap
+ * between Supabase's auth service (which mints the token) and the database's own PostgREST
+ * instance (which validates it), not a bug in this app. It's inherently transient — wall-clock
+ * time catches up within ~1-2s — and can hit ANY request through this client (meals, goals,
+ * workouts, whichever repo call happens to fire in that window), so the fix belongs at the fetch
+ * layer, once, rather than patched into every individual repo function.
+ */
+export async function fetchWithJwtSkewRetry(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  const res = await fetch(input, init)
+  if (res.status !== 401) return res
+
+  const body = await res.clone().text().catch(() => '')
+  if (!body.includes('PGRST303') && !body.includes('JWT issued at future')) return res
+
+  await new Promise((r) => setTimeout(r, 1200))
+  return fetch(input, init)
+}
+
+export const supabase = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY, {
+  global: { fetch: fetchWithJwtSkewRetry },
+})
