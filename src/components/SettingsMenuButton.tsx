@@ -15,7 +15,7 @@ export function SettingsMenuButton({ onClick }: { onClick: () => void }) {
     <button
       onClick={onClick}
       aria-label="Menu — Settings"
-      className="glass absolute right-4 top-2 flex items-center gap-2 rounded-full py-1.5 pl-1.5 pr-3"
+      className="glass absolute right-2 top-1 flex items-center gap-2 rounded-full py-1.5 pl-1.5 pr-3"
       style={{
         border: `1px solid ${RING_COLOR}66`,
         boxShadow: `0 0 14px -2px ${RING_COLOR}80`,

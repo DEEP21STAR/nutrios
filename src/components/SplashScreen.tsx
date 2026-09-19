@@ -371,7 +371,7 @@ export function SplashScreen({ onDone }: { onDone: () => void }) {
             S
           </span>
         </div>
-        <div className="flex gap-1.5 text-caption tracking-[0.3em] text-text-tertiary">
+        <div className="splash-tagline-chrome flex gap-1.5 text-caption font-semibold tracking-[0.3em]">
           {TAGLINE_WORDS.map((word, i) => (
             <span
               key={i}
