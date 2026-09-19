@@ -16,6 +16,7 @@ import { WhetuFooter } from '@/components/WhetuFooter'
 import { SplashScreen } from '@/components/SplashScreen'
 import { OnboardingWizard } from '@/components/OnboardingWizard'
 import { SettingsPanel } from '@/components/SettingsPanel'
+import { SettingsMenuButton } from '@/components/SettingsMenuButton'
 import { useRegisterSW } from 'virtual:pwa-register/react'
 import { getStoredTheme, applyTheme, type Theme } from '@/lib/theme'
 import { identifyFoodViaOllama } from '@/lib/ollamaVision'
@@ -360,16 +361,7 @@ export default function App() {
       />
 
       <header className="relative p-4 text-center">
-        <button
-          onClick={() => setShowSettings(true)}
-          aria-label="Settings"
-          className="absolute right-4 top-4 text-text-tertiary"
-        >
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
-            <circle cx="12" cy="12" r="3.2" />
-            <path d="M19.4 13a7.6 7.6 0 0 0 0-2l2-1.5-2-3.4-2.4.6a7.6 7.6 0 0 0-1.7-1l-.3-2.5H9l-.3 2.5a7.6 7.6 0 0 0-1.7 1l-2.4-.6-2 3.4L4.6 11a7.6 7.6 0 0 0 0 2l-2 1.5 2 3.4 2.4-.6a7.6 7.6 0 0 0 1.7 1l.3 2.5h6l.3-2.5a7.6 7.6 0 0 0 1.7-1l2.4.6 2-3.4-2-1.5Z" />
-          </svg>
-        </button>
+        <SettingsMenuButton onClick={() => setShowSettings(true)} />
         <h1 className="text-title">
           {activeTab === 'today' ? 'Today' : activeTab === 'progress' ? 'Progress' : 'Together'}
         </h1>

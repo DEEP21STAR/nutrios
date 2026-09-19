@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { ImagePlus } from 'lucide-react'
 import { uploadAvatar, saveAvatarChoice } from '@/lib/avatarRepo'
 
 /** Curated defaults, same visual family as togetherDemo.ts's DEMO_FRIENDS emoji avatars, so your
@@ -77,6 +78,14 @@ export function AvatarPicker({
       {error && <p className="text-caption text-accent-danger">{error}</p>}
 
       <div className="flex flex-wrap gap-2">
+        <button
+          onClick={() => fileInput.current?.click()}
+          disabled={uploading}
+          aria-label="Choose a photo from your gallery"
+          className="flex h-11 w-11 items-center justify-center rounded-full border border-dashed border-accent-health/50 bg-accent-health/10 text-accent-health transition-colors"
+        >
+          <ImagePlus size={18} />
+        </button>
         {DEFAULT_AVATARS.map((emoji) => (
           <button
             key={emoji}

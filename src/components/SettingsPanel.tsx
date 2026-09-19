@@ -179,7 +179,7 @@ export function SettingsPanel({
                 rel="noopener noreferrer"
                 className="rounded-xl border border-accent-energy/40 bg-accent-energy/10 py-3 text-center text-body font-semibold text-accent-energy"
               >
-                Buy me a coffee
+                Buy me a coffee (donation link)
               </a>
               <button
                 onClick={() => {

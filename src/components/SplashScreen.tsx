@@ -75,6 +75,13 @@ export function SplashScreen({ onDone }: { onDone: () => void }) {
   const smilePathRef = useRef<SVGPathElement>(null)
   const sRef = useRef<HTMLSpanElement>(null)
   const taglineWordRefs = useRef<(HTMLSpanElement | null)[]>([])
+  const finishRef = useRef<() => void>(() => {})
+  const tlRef = useRef<gsap.core.Timeline | null>(null)
+
+  function handleSkip() {
+    tlRef.current?.kill()
+    finishRef.current()
+  }
 
   useEffect(() => {
     const isFirstRun = !localStorage.getItem(INTRO_SEEN_KEY)
@@ -99,6 +106,7 @@ export function SplashScreen({ onDone }: { onDone: () => void }) {
       done = true
       onDone()
     }
+    finishRef.current = finish
     const watchdog = setTimeout(finish, totalEstimateMs + 3000)
 
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -111,6 +119,7 @@ export function SplashScreen({ onDone }: { onDone: () => void }) {
     }
 
     const tl = gsap.timeline()
+    tlRef.current = tl
 
     if (isFirstRun) {
       SPLASH_CATEGORIES.forEach((cat, i) => {
@@ -344,6 +353,20 @@ export function SplashScreen({ onDone }: { onDone: () => void }) {
           ))}
         </div>
       </div>
+
+      <button
+        onClick={handleSkip}
+        className="absolute bottom-[calc(env(safe-area-inset-bottom,0px)+20px)] right-5 z-10 rounded-full border px-4 py-2 text-caption font-semibold tracking-wide"
+        style={{
+          color: '#10d8ff',
+          borderColor: 'rgb(16 216 255 / 0.4)',
+          backgroundColor: 'rgb(16 216 255 / 0.08)',
+          textShadow: '0 0 10px rgb(16 216 255 / 0.7)',
+          boxShadow: '0 0 16px rgb(16 216 255 / 0.25)',
+        }}
+      >
+        Skip
+      </button>
     </div>
   )
 }
