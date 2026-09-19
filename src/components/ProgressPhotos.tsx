@@ -9,8 +9,17 @@ import {
   getProgressPhotoUrl,
   listProgressPhotos,
   uploadProgressPhoto,
+  POSES,
+  type Pose,
   type ProgressPhoto,
 } from '@/lib/progressPhotosRepo'
+
+const POSE_LABEL: Record<Pose, string> = { front: 'Front', side: 'Side', back: 'Back' }
+const POSE_HINT: Record<Pose, string> = {
+  front: 'Face the camera straight on',
+  side: 'Turn to your side, arms relaxed',
+  back: 'Turn your back to the camera',
+}
 
 /** Free tier sees the most recent 10 (still fully uploaded/stored either way — this only caps
  * what's shown, never what's kept, so upgrading later restores full history instantly rather
@@ -31,7 +40,8 @@ export function ProgressPhotos({ userId, onOpenSettings }: { userId: string; onO
   const [photos, setPhotos] = useState<ProgressPhoto[] | null>(null)
   const [urls, setUrls] = useState<Record<string, string>>({})
   const [error, setError] = useState<string | null>(null)
-  const [capturing, setCapturing] = useState(false)
+  const [selectingPose, setSelectingPose] = useState(false)
+  const [capturingPose, setCapturingPose] = useState<Pose | null>(null)
   const [viewing, setViewing] = useState<ProgressPhoto | null>(null)
   const [compareMode, setCompareMode] = useState(false)
   const [compareIds, setCompareIds] = useState<string[]>([])
@@ -61,9 +71,10 @@ export function ProgressPhotos({ userId, onOpenSettings }: { userId: string; onO
   const hiddenCount = photos === null || premium ? 0 : Math.max(0, photos.length - FREE_PHOTO_LIMIT)
 
   async function handleCaptured(blob: Blob) {
-    setCapturing(false)
+    const pose = capturingPose
+    setCapturingPose(null)
     try {
-      const saved = await uploadProgressPhoto(blob, userId)
+      const saved = await uploadProgressPhoto(blob, userId, pose ? { pose } : {})
       const url = await getProgressPhotoUrl(saved.storagePath)
       setPhotos((prev) => [saved, ...(prev ?? [])])
       setUrls((prev) => ({ ...prev, [saved.id]: url }))
@@ -72,6 +83,13 @@ export function ProgressPhotos({ userId, onOpenSettings }: { userId: string; onO
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save progress photo.')
     }
+  }
+
+  /** Most recent photo of the SAME pose, for the capture screen's alignment ghost — falls back to
+   * the generic silhouette guide (no ghost image) when this is the first shot of that pose. */
+  function lastPhotoUrlForPose(pose: Pose): string | undefined {
+    const match = (photos ?? []).find((p) => p.pose === pose)
+    return match ? urls[match.id] : undefined
   }
 
   async function handleDelete(photo: ProgressPhoto) {
@@ -137,7 +155,7 @@ export function ProgressPhotos({ userId, onOpenSettings }: { userId: string; onO
           <button
             onClick={() => {
               hapticTap()
-              setCapturing(true)
+              setSelectingPose(true)
             }}
             className="glass rounded-full px-3 py-1 text-caption text-accent-health shadow-[0_0_12px_1px_var(--glow-health)]"
           >
@@ -178,6 +196,11 @@ export function ProgressPhotos({ userId, onOpenSettings }: { userId: string; onO
                 )}
               >
                 {urls[photo.id] && <img src={urls[photo.id]} alt="" className="h-full w-full object-cover" />}
+                {photo.pose && (
+                  <span className="absolute right-1 top-1 rounded bg-accent-ai/80 px-1 py-0.5 text-[9px] font-semibold uppercase text-white">
+                    {POSE_LABEL[photo.pose]}
+                  </span>
+                )}
                 <span className="absolute inset-x-0 bottom-0 bg-black/50 px-1 py-0.5 text-[10px] text-white">
                   {photo.takenAt.slice(0, 10)}
                 </span>
@@ -195,7 +218,44 @@ export function ProgressPhotos({ userId, onOpenSettings }: { userId: string; onO
         </>
       )}
 
-      {capturing && <ProgressPhotoCapture guideUrl={urls[photos?.[0]?.id ?? '']} onCapture={handleCaptured} onCancel={() => setCapturing(false)} />}
+      {selectingPose && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-4 bg-bg-primary/95 p-6">
+          <h3 className="text-subtitle text-text-primary">Which pose?</h3>
+          <p className="max-w-xs text-center text-caption text-text-tertiary">
+            Naming the pose lets NUTRYOS line up this shot with your last one of the same angle.
+          </p>
+          <div className="flex flex-col gap-3">
+            {POSES.map((pose) => (
+              <button
+                key={pose}
+                onClick={() => {
+                  hapticTap()
+                  setSelectingPose(false)
+                  setCapturingPose(pose)
+                }}
+                className="glass w-56 rounded-xl px-5 py-3 text-body font-semibold text-accent-health"
+              >
+                {POSE_LABEL[pose]}
+                <span className="ml-2 text-caption font-normal text-text-tertiary">
+                  {(photos ?? []).some((p) => p.pose === pose) ? '' : '· first shot'}
+                </span>
+              </button>
+            ))}
+          </div>
+          <button onClick={() => setSelectingPose(false)} className="text-caption text-text-tertiary underline">
+            Cancel
+          </button>
+        </div>
+      )}
+
+      {capturingPose && (
+        <ProgressPhotoCapture
+          pose={capturingPose}
+          guideUrl={lastPhotoUrlForPose(capturingPose)}
+          onCapture={handleCaptured}
+          onCancel={() => setCapturingPose(null)}
+        />
+      )}
 
       {viewing && (
         <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-4 bg-bg-primary/95 p-6">
@@ -222,10 +282,12 @@ export function ProgressPhotos({ userId, onOpenSettings }: { userId: string; onO
  * stalled permission prompt can't strand someone with a dead shutter) — but no AI identify step,
  * this just captures and saves. */
 function ProgressPhotoCapture({
+  pose,
   guideUrl,
   onCapture,
   onCancel,
 }: {
+  pose: Pose
   guideUrl?: string
   onCapture: (blob: Blob) => void
   onCancel: () => void
@@ -308,22 +370,29 @@ function ProgressPhotoCapture({
       ) : (
         <>
           <video ref={videoRef} playsInline muted className="h-full w-full flex-1 object-cover" />
-          {guideUrl && (
+          {guideUrl ? (
             <img
               src={guideUrl}
               alt=""
               aria-hidden
               className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-25 mix-blend-luminosity"
             />
+          ) : (
+            <div aria-hidden className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-20">
+              <PoseSilhouette className="h-[70%]" />
+            </div>
           )}
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/70" />
-          <div className="absolute inset-x-0 top-0 flex items-center justify-between p-4">
-            <button onClick={onCancel} className="glass rounded-full px-4 py-2 text-caption text-text-primary">
-              Cancel
-            </button>
-            {guideUrl && (
-              <span className="glass rounded-full px-3 py-1 text-caption text-accent-ai">Ghost = your last photo</span>
-            )}
+          <div className="absolute inset-x-0 top-0 flex flex-col items-center gap-2 p-4">
+            <div className="flex w-full items-center justify-between">
+              <button onClick={onCancel} className="glass rounded-full px-4 py-2 text-caption text-text-primary">
+                Cancel
+              </button>
+              <span className="glass rounded-full px-3 py-1 text-caption text-accent-ai">
+                {guideUrl ? `Ghost = your last ${POSE_LABEL[pose].toLowerCase()} shot` : `First ${POSE_LABEL[pose].toLowerCase()} shot`}
+              </span>
+            </div>
+            <p className="glass rounded-full px-3 py-1 text-caption text-text-secondary">{POSE_HINT[pose]}</p>
           </div>
           <div className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-3 pb-10">
             <button
@@ -339,6 +408,19 @@ function ProgressPhotoCapture({
         </>
       )}
     </div>
+  )
+}
+
+/** Generic full-body outline shown when there's no prior photo of this pose yet to ghost against
+ * — the honest scope here (matching how ProgressPhotos.tsx's own header comment frames the
+ * ghost-overlay feature): one silhouette for centering/framing, not three bespoke angle-accurate
+ * poses. The spoken hint text above (POSE_HINT) carries the actual front/side/back distinction. */
+function PoseSilhouette({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 100 220" className={className} fill="none" stroke="white" strokeWidth="2">
+      <circle cx="50" cy="24" r="18" />
+      <path d="M50 42 L50 130 M50 60 L20 110 M50 60 L80 110 M50 130 L28 210 M50 130 L72 210" strokeLinecap="round" />
+    </svg>
   )
 }
 

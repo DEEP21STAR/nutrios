@@ -4,12 +4,16 @@ import { resizeForUpload } from '@/lib/imageResize'
 const BUCKET = 'progress-photos'
 const SIGNED_URL_TTL_S = 60 * 60 // 1 hour — plenty for a single viewing session
 
+export type Pose = 'front' | 'side' | 'back'
+export const POSES: Pose[] = ['front', 'side', 'back']
+
 export interface ProgressPhoto {
   id: string
   takenAt: string
   weightKg: number | null
   note: string | null
   storagePath: string
+  pose: Pose | null
 }
 
 /**
@@ -22,7 +26,7 @@ export interface ProgressPhoto {
 export async function uploadProgressPhoto(
   photo: Blob,
   userId: string,
-  opts: { weightKg?: number; note?: string } = {},
+  opts: { weightKg?: number; note?: string; pose?: Pose } = {},
 ): Promise<ProgressPhoto> {
   const { blob, mimeType, extension } = await resizeForUpload(photo, 1080)
   const path = `${userId}/${crypto.randomUUID()}.${extension}`
@@ -35,8 +39,14 @@ export async function uploadProgressPhoto(
 
   const { data, error: insertError } = await supabase
     .from('progress_photos')
-    .insert({ user_id: userId, storage_path: path, weight_kg: opts.weightKg ?? null, note: opts.note ?? null })
-    .select('id, taken_at, weight_kg, note, storage_path')
+    .insert({
+      user_id: userId,
+      storage_path: path,
+      weight_kg: opts.weightKg ?? null,
+      note: opts.note ?? null,
+      pose: opts.pose ?? null,
+    })
+    .select('id, taken_at, weight_kg, note, storage_path, pose')
     .single()
   if (insertError || !data) {
     // Clean up the orphaned upload rather than leaving a file with no row pointing at it.
@@ -44,13 +54,20 @@ export async function uploadProgressPhoto(
     throw new Error(`Failed to save progress photo: ${insertError?.message ?? 'no data'}`)
   }
 
-  return { id: data.id, takenAt: data.taken_at, weightKg: data.weight_kg, note: data.note, storagePath: data.storage_path }
+  return {
+    id: data.id,
+    takenAt: data.taken_at,
+    weightKg: data.weight_kg,
+    note: data.note,
+    storagePath: data.storage_path,
+    pose: data.pose,
+  }
 }
 
 export async function listProgressPhotos(userId: string): Promise<ProgressPhoto[]> {
   const { data, error } = await supabase
     .from('progress_photos')
-    .select('id, taken_at, weight_kg, note, storage_path')
+    .select('id, taken_at, weight_kg, note, storage_path, pose')
     .eq('user_id', userId)
     .order('taken_at', { ascending: false })
   if (error) throw new Error(`Failed to load progress photos: ${error.message}`)
@@ -60,6 +77,7 @@ export async function listProgressPhotos(userId: string): Promise<ProgressPhoto[
     weightKg: row.weight_kg,
     note: row.note,
     storagePath: row.storage_path,
+    pose: row.pose,
   }))
 }
 
