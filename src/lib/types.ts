@@ -7,6 +7,12 @@ export interface FoodItem {
   proteinG: number
   fatG: number
   carbsG: number
+  /** Optional -- not every source (AI-vision estimate with no DB match) can provide these.
+   * Real competitive gap closed 2026-09-19: fiber/sugar depth is the recurring free-vs-premium
+   * split across every calorie tracker researched (Cronometer/MyNetDiary gate 100+ nutrients,
+   * MyFitnessPal gates parts of this) -- NUTRYOS offers it free. */
+  fiberG?: number
+  sugarG?: number
   /** Open Food Facts product code this lookup resolved to, if any (barcode/text match). */
   offCode?: string
   /** True once the "Adjust for restaurant prep" nudge (Phase 3, Restaurant/Takeaway Mode) has
@@ -43,6 +49,11 @@ export interface MacroTotals {
   proteinG: number
   fatG: number
   carbsG: number
+  /** Optional -- see FoodItem's own comment for why (not every source provides these). Omitted
+   * from every existing plain-object MacroTotals literal in the codebase on purpose, so this
+   * stays a genuinely additive change rather than a breaking one. */
+  fiberG?: number
+  sugarG?: number
 }
 
 export function sumMacros(items: FoodItem[]): MacroTotals {
@@ -52,8 +63,10 @@ export function sumMacros(items: FoodItem[]): MacroTotals {
       proteinG: acc.proteinG + it.proteinG,
       fatG: acc.fatG + it.fatG,
       carbsG: acc.carbsG + it.carbsG,
+      fiberG: (acc.fiberG ?? 0) + (it.fiberG ?? 0),
+      sugarG: (acc.sugarG ?? 0) + (it.sugarG ?? 0),
     }),
-    { calories: 0, proteinG: 0, fatG: 0, carbsG: 0 },
+    { calories: 0, proteinG: 0, fatG: 0, carbsG: 0, fiberG: 0, sugarG: 0 },
   )
 }
 

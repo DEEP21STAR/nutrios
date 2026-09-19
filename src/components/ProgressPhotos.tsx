@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
+import { Lock } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { hapticSuccess, hapticTap } from '@/lib/haptics'
 import { playScanSuccessPing } from '@/lib/chime'
+import { isPremiumUnlocked } from '@/lib/premium'
 import {
   deleteProgressPhoto,
   getProgressPhotoUrl,
@@ -9,6 +11,11 @@ import {
   uploadProgressPhoto,
   type ProgressPhoto,
 } from '@/lib/progressPhotosRepo'
+
+/** Free tier sees the most recent 10 (still fully uploaded/stored either way — this only caps
+ * what's shown, never what's kept, so upgrading later restores full history instantly rather
+ * than needing to re-upload anything). */
+const FREE_PHOTO_LIMIT = 10
 
 /**
  * Progress photos — the one genuinely new feature from Deep's "elevate everything" research
@@ -20,7 +27,7 @@ import {
  * pose-matching/computer-vision alignment is a much bigger lift — this is the honest, achievable
  * version of "line up your shot with last time" for this pass).
  */
-export function ProgressPhotos({ userId }: { userId: string }) {
+export function ProgressPhotos({ userId, onOpenSettings }: { userId: string; onOpenSettings: () => void }) {
   const [photos, setPhotos] = useState<ProgressPhoto[] | null>(null)
   const [urls, setUrls] = useState<Record<string, string>>({})
   const [error, setError] = useState<string | null>(null)
@@ -48,6 +55,10 @@ export function ProgressPhotos({ userId }: { userId: string }) {
       cancelled = true
     }
   }, [userId])
+
+  const premium = isPremiumUnlocked()
+  const visiblePhotos = photos === null ? [] : premium ? photos : photos.slice(0, FREE_PHOTO_LIMIT)
+  const hiddenCount = photos === null || premium ? 0 : Math.max(0, photos.length - FREE_PHOTO_LIMIT)
 
   async function handleCaptured(blob: Blob) {
     setCapturing(false)
@@ -155,23 +166,33 @@ export function ProgressPhotos({ userId }: { userId: string }) {
           No progress photos yet — private to you until you choose to share one.
         </p>
       ) : (
-        <div className="grid grid-cols-3 gap-2">
-          {photos.map((photo) => (
+        <>
+          <div className="grid grid-cols-3 gap-2">
+            {visiblePhotos.map((photo) => (
+              <button
+                key={photo.id}
+                onClick={() => (compareMode ? toggleCompare(photo.id) : setViewing(photo))}
+                className={cn(
+                  'relative aspect-square overflow-hidden rounded-lg bg-bg-secondary',
+                  compareMode && compareIds.includes(photo.id) && 'ring-2 ring-accent-ai',
+                )}
+              >
+                {urls[photo.id] && <img src={urls[photo.id]} alt="" className="h-full w-full object-cover" />}
+                <span className="absolute inset-x-0 bottom-0 bg-black/50 px-1 py-0.5 text-[10px] text-white">
+                  {photo.takenAt.slice(0, 10)}
+                </span>
+              </button>
+            ))}
+          </div>
+          {hiddenCount > 0 && (
             <button
-              key={photo.id}
-              onClick={() => (compareMode ? toggleCompare(photo.id) : setViewing(photo))}
-              className={cn(
-                'relative aspect-square overflow-hidden rounded-lg bg-bg-secondary',
-                compareMode && compareIds.includes(photo.id) && 'ring-2 ring-accent-ai',
-              )}
+              onClick={onOpenSettings}
+              className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-accent-energy/40 bg-accent-energy/5 py-3 text-caption text-accent-energy"
             >
-              {urls[photo.id] && <img src={urls[photo.id]} alt="" className="h-full w-full object-cover" />}
-              <span className="absolute inset-x-0 bottom-0 bg-black/50 px-1 py-0.5 text-[10px] text-white">
-                {photo.takenAt.slice(0, 10)}
-              </span>
+              <Lock size={14} /> {hiddenCount} older photo{hiddenCount === 1 ? '' : 's'} — Premium unlocks full history
             </button>
-          ))}
-        </div>
+          )}
+        </>
       )}
 
       {capturing && <ProgressPhotoCapture guideUrl={urls[photos?.[0]?.id ?? '']} onCapture={handleCaptured} onCancel={() => setCapturing(false)} />}

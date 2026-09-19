@@ -25,7 +25,7 @@ export function GoalImpact({
   goals: Goals
 }) {
   const rows: Array<{
-    key: keyof MacroTotals
+    key: 'calories' | 'proteinG' | 'fatG' | 'carbsG'
     label: string
     unit: string
     goal: number

@@ -290,6 +290,26 @@ export function ConfirmLog({
               <MacroField label="Carbs" value={item.carbsG} onChange={(v) => updateItem(item.id, { carbsG: v })} color={MACRO_COLORS.carbs} />
             </div>
 
+            {/* Fiber/sugar only appear once a lookup actually provided them (common-foods dataset
+                or an Open Food Facts match with that data) -- undefined on a manually-added item
+                or an unmatched AI guess, so this row only shows real data, never a fabricated 0. */}
+            {(item.fiberG !== undefined || item.sugarG !== undefined) && (
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <MacroField
+                  label="Fiber"
+                  value={item.fiberG ?? 0}
+                  onChange={(v) => updateItem(item.id, { fiberG: v })}
+                  color={MACRO_COLORS.fiber}
+                />
+                <MacroField
+                  label="Sugar"
+                  value={item.sugarG ?? 0}
+                  onChange={(v) => updateItem(item.id, { sugarG: v })}
+                  color={MACRO_COLORS.sugar}
+                />
+              </div>
+            )}
+
             {/* Restaurant-prep nudge (Phase 3, item 3) — only offered while Eating Out is on,
                 one-shot per item (see eatingOutAdjustment.ts for the exact multiplier + the
                 honest reasoning behind it), and always a manual tap — never applied silently. */}
@@ -322,6 +342,8 @@ export function ConfirmLog({
           <span className="text-data text-text-primary">
             {Math.round(totals.calories)} kcal · P{Math.round(totals.proteinG)} F{Math.round(totals.fatG)} C
             {Math.round(totals.carbsG)}
+            {!!totals.fiberG && ` · Fi${Math.round(totals.fiberG)}`}
+            {!!totals.sugarG && ` Su${Math.round(totals.sugarG)}`}
           </span>
         </div>
         <button

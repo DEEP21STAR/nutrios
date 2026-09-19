@@ -9,6 +9,15 @@ const TABS: Array<{ key: TabKey; label: string; Icon: typeof TodayTabIcon }> = [
   { key: 'together', label: 'Together', Icon: TogetherTabIcon },
 ]
 
+/** Same three accent/glow pairs TabIcons.tsx already lights the icons up with — reused here so
+ * the active label glows the same colour as its icon instead of staying plain white, one lighting
+ * system across icon + underline + text rather than three independent choices. */
+const TAB_ACCENT: Record<TabKey, { color: string; glow: string }> = {
+  today: { color: 'var(--color-accent-health)', glow: 'var(--glow-health)' },
+  progress: { color: 'var(--color-accent-energy)', glow: 'var(--glow-energy)' },
+  together: { color: 'var(--color-accent-ai)', glow: 'var(--glow-ai)' },
+}
+
 /**
  * Replaces the old single-scroll layout (Today ring → Achievements →
  * Together Mode → Trends, all stacked forever) with three real sections
@@ -22,6 +31,7 @@ export function TabBar({ active, onChange }: { active: TabKey; onChange: (tab: T
     <nav className="glass fixed inset-x-0 bottom-0 z-30 flex items-stretch justify-around border-t border-white/5 pb-[env(safe-area-inset-bottom,0px)]">
       {TABS.map(({ key, label, Icon }) => {
         const isActive = active === key
+        const accent = TAB_ACCENT[key]
         return (
           <button
             key={key}
@@ -31,10 +41,8 @@ export function TabBar({ active, onChange }: { active: TabKey; onChange: (tab: T
           >
             <Icon active={isActive} />
             <span
-              className={cn(
-                'text-caption transition-colors',
-                isActive ? 'font-semibold text-text-primary' : 'text-text-muted',
-              )}
+              className={cn('text-caption transition-colors', isActive ? 'font-semibold' : 'text-text-muted')}
+              style={isActive ? { color: accent.color, textShadow: `0 0 8px ${accent.glow}` } : undefined}
             >
               {label}
             </span>
@@ -43,14 +51,7 @@ export function TabBar({ active, onChange }: { active: TabKey; onChange: (tab: T
                 'h-0.5 w-6 rounded-full transition-all duration-300',
                 isActive ? 'opacity-100' : 'scale-x-0 opacity-0',
               )}
-              style={{
-                background:
-                  key === 'today'
-                    ? 'var(--color-accent-health)'
-                    : key === 'progress'
-                      ? 'var(--color-accent-energy)'
-                      : 'var(--color-accent-ai)',
-              }}
+              style={{ background: accent.color, boxShadow: isActive ? `0 0 6px 1px ${accent.glow}` : undefined }}
               aria-hidden
             />
           </button>

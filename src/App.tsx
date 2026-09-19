@@ -5,6 +5,7 @@ import { MenuCapture } from '@/components/MenuCapture'
 import { ConfirmLog } from '@/components/ConfirmLog'
 import { TodayRing } from '@/components/TodayRing'
 import { HealthyScoreGauge } from '@/components/HealthyScoreGauge'
+import { StreakBanner } from '@/components/StreakBanner'
 import { MealTimeline } from '@/components/MealTimeline'
 import { TipsTicker } from '@/components/TipsTicker'
 import { Achievements } from '@/components/Achievements'
@@ -395,6 +396,7 @@ export default function App() {
           {/* Phase 5, Healthy Score — added alongside TodayRing, not replacing any part of it
               (see HealthyScoreGauge.tsx's own header comment for why). */}
           <HealthyScoreGauge totals={totals} goals={goals ?? DEFAULT_GOALS} todaysMeals={meals} />
+          <StreakBanner userId={userId} todaysMealCount={meals.length} />
           <MealTimeline meals={meals} />
           <TipsTicker meals={meals} goals={goals ?? DEFAULT_GOALS} />
         </>
@@ -407,10 +409,10 @@ export default function App() {
           <Achievements meals={meals} goals={goals ?? DEFAULT_GOALS} />
           {/* Phase 5, Trends & History — real weekly calorie bar chart + weight trend (or its
               honest empty state). */}
-          <TrendsHistory userId={userId} goals={goals ?? DEFAULT_GOALS} />
+          <TrendsHistory userId={userId} goals={goals ?? DEFAULT_GOALS} displayName={displayName} />
           {/* Progress photos — private timeline + before/after compare + share, its own
               top-level section matching Achievements/TrendsHistory's pattern. */}
-          {userId && <ProgressPhotos userId={userId} />}
+          {userId && <ProgressPhotos userId={userId} onOpenSettings={() => setShowSettings(true)} />}
         </>
       )}
 

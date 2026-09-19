@@ -554,3 +554,25 @@ body,
     opacity: 0;
   }
 }
+
+/* Donation-link CTA — Deep: "pulse neon so people know it's a donation link", explicitly wants
+   this one to stand out over the rest of Settings' otherwise static cards. */
+.donation-pulse {
+  animation: donationPulse 2.2s ease-in-out infinite;
+}
+@keyframes donationPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 6px 0 rgb(255 184 0 / 0.35);
+    border-color: rgb(255 184 0 / 0.4);
+  }
+  50% {
+    box-shadow: 0 0 20px 3px rgb(255 184 0 / 0.75);
+    border-color: rgb(255 184 0 / 0.9);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .donation-pulse {
+    animation: none;
+  }
+}

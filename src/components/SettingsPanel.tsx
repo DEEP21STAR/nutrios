@@ -1,8 +1,18 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { Images, Zap, Palette, Snowflake, Crown, ShieldCheck, Download } from 'lucide-react'
 import { applyTheme, type Theme } from '@/lib/theme'
 import { AvatarPicker } from '@/components/AvatarPicker'
 import { isPremiumUnlocked, setPremiumUnlocked } from '@/lib/premium'
 import { saveDisplayName } from '@/lib/avatarRepo'
+import { isAnonymousAccount, isGoogleLinked, linkGoogleAccount } from '@/lib/accountLink'
+import { downloadJson, exportUserData } from '@/lib/dataExport'
+
+const PREMIUM_FEATURES = [
+  { Icon: Images, text: 'Full progress-photo history (free: most recent 10)' },
+  { Icon: Snowflake, text: 'Bank up to 3 streak freezes (free: 1)' },
+  { Icon: Zap, text: 'Priority AI food recognition' },
+  { Icon: Palette, text: 'Custom app themes as they ship' },
+]
 
 interface SettingsPanelProps {
   onClose: () => void
@@ -40,6 +50,44 @@ export function SettingsPanel({
   const [checkState, setCheckState] = useState<'idle' | 'checking' | 'up-to-date'>('idle')
   const [nameInput, setNameInput] = useState(displayName ?? '')
   const [savingName, setSavingName] = useState(false)
+  const [googleLinked, setGoogleLinked] = useState<boolean | null>(null)
+  const [linkingGoogle, setLinkingGoogle] = useState(false)
+  const [linkError, setLinkError] = useState<string | null>(null)
+  const [exportingData, setExportingData] = useState(false)
+
+  useEffect(() => {
+    isGoogleLinked().then(setGoogleLinked)
+  }, [])
+
+  async function handleLinkGoogle() {
+    setLinkingGoogle(true)
+    setLinkError(null)
+    try {
+      const stillAnonymous = await isAnonymousAccount()
+      if (!stillAnonymous) {
+        setGoogleLinked(true)
+        return
+      }
+      await linkGoogleAccount() // redirects the browser away on success
+    } catch (err) {
+      setLinkError(err instanceof Error ? err.message : 'Could not start the Google link.')
+      setLinkingGoogle(false)
+    }
+  }
+
+  async function handleExportData() {
+    if (!userId) return
+    setExportingData(true)
+    try {
+      const data = await exportUserData(userId, displayName)
+      downloadJson(data, `nutryos-data-${new Date().toISOString().slice(0, 10)}.json`)
+      flashToast('Data downloaded')
+    } catch (err) {
+      flashToast(err instanceof Error ? err.message : 'Export failed')
+    } finally {
+      setExportingData(false)
+    }
+  }
   // Every setting here applies instantly (no explicit Save action) — that's correct behavior,
   // but tapping something and seeing nothing happen looks exactly like it silently failed. This
   // toast is the fix: real, if quiet, confirmation instead of just trusting the selected-border
@@ -141,19 +189,33 @@ export function SettingsPanel({
           </div>
         </section>
 
-        <section className="glass-card flex flex-col gap-3 p-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-body font-semibold">Premium</h3>
+        <section
+          className="glass-card relative flex flex-col gap-3 overflow-hidden p-4"
+          style={{ boxShadow: premium ? '0 0 24px -4px var(--glow-energy)' : undefined, borderColor: 'rgb(255 184 0 / 0.25)' }}
+        >
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0"
+            style={{ background: 'radial-gradient(120% 60% at 100% 0%, rgb(255 184 0 / 0.08), transparent 60%)' }}
+          />
+          <div className="relative flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              <Crown size={16} className="text-accent-energy" />
+              <h3 className="text-body font-semibold">Premium</h3>
+            </div>
             {premium && (
               <span className="rounded-full bg-accent-energy/15 px-2 py-0.5 text-caption font-semibold text-accent-energy">
                 Unlocked
               </span>
             )}
           </div>
-          <ul className="flex flex-col gap-1.5 text-caption text-text-secondary">
-            <li>• Unlimited progress-photo history</li>
-            <li>• Priority AI food recognition</li>
-            <li>• Custom app themes as they ship</li>
+          <ul className="relative flex flex-col gap-2 text-caption text-text-secondary">
+            {PREMIUM_FEATURES.map(({ Icon, text }) => (
+              <li key={text} className="flex items-center gap-2">
+                <Icon size={14} className="shrink-0 text-accent-energy" />
+                {text}
+              </li>
+            ))}
           </ul>
           {premium ? (
             <button
@@ -177,9 +239,9 @@ export function SettingsPanel({
                 href="https://buymeacoffee.com/nutryos"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="rounded-xl border border-accent-energy/40 bg-accent-energy/10 py-3 text-center text-body font-semibold text-accent-energy"
+                className="donation-pulse rounded-xl border bg-accent-energy/10 py-3 text-center text-body font-semibold text-accent-energy"
               >
-                Buy me a coffee (donation link)
+                Buy me a coffee (Donation Link)
               </a>
               <button
                 onClick={() => {
@@ -193,6 +255,40 @@ export function SettingsPanel({
               </button>
             </>
           )}
+        </section>
+
+        <section className="glass-card flex flex-col gap-3 p-4">
+          <h3 className="flex items-center gap-1.5 text-body font-semibold">
+            <ShieldCheck size={16} className="text-accent-health" /> Account & Backup
+          </h3>
+          <p className="text-caption text-text-tertiary">
+            NUTRYOS signs you in anonymously so there's nothing to set up — but that means clearing
+            your browser data or switching devices loses access to everything below. Google backup
+            fixes that without changing anything about your account.
+          </p>
+
+          {googleLinked ? (
+            <p className="flex items-center gap-1.5 text-caption text-accent-health">
+              <ShieldCheck size={14} /> Backed up via Google — recoverable on any device
+            </p>
+          ) : (
+            <button
+              onClick={handleLinkGoogle}
+              disabled={linkingGoogle || googleLinked === null}
+              className="rounded-xl border border-accent-health/40 bg-accent-health/10 py-3 text-body font-semibold text-accent-health disabled:opacity-50"
+            >
+              {linkingGoogle ? 'Opening Google…' : 'Back up with Google'}
+            </button>
+          )}
+          {linkError && <p className="text-caption text-accent-danger">{linkError}</p>}
+
+          <button
+            onClick={handleExportData}
+            disabled={exportingData}
+            className="flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-bg-secondary py-3 text-body text-text-secondary disabled:opacity-50"
+          >
+            <Download size={16} /> {exportingData ? 'Preparing…' : 'Download your data'}
+          </button>
         </section>
 
         <section className="glass-card flex flex-col gap-3 p-4">

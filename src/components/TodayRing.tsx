@@ -2,7 +2,7 @@ import { RadialProgress } from '@/components/RadialProgress'
 import { CountUp } from '@/components/CountUp'
 import type { MacroTotals, Goals } from '@/lib/types'
 
-export const MACRO_COLORS = { protein: '#f472b6', fat: '#fbbf24', carbs: '#60a5fa' } as const
+export const MACRO_COLORS = { protein: '#f472b6', fat: '#fbbf24', carbs: '#60a5fa', fiber: '#84cc16', sugar: '#f87171' } as const
 
 /**
  * Low-remaining threshold judgment call (the spec calls for "amber/crimson

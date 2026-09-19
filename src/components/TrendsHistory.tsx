@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Share2 } from 'lucide-react'
+import { WeeklyRecapCard } from '@/components/WeeklyRecapCard'
 import {
   Bar,
   BarChart,
@@ -38,8 +40,9 @@ const HISTORY_DAYS = 7
  * so a meal logged while this section is on-screen won't retroactively update its own bars until
  * the next reload. Small, honest gap, not fixed this pass — flagged in the phase report.
  */
-export function TrendsHistory({ userId, goals }: { userId: string | null; goals: Goals }) {
+export function TrendsHistory({ userId, goals, displayName }: { userId: string | null; goals: Goals; displayName?: string | null }) {
   const [historyMeals, setHistoryMeals] = useState<Meal[] | null>(null)
+  const [showRecap, setShowRecap] = useState(false)
   const [historyError, setHistoryError] = useState<string | null>(null)
   const [weightLogs, setWeightLogs] = useState<WeightLog[] | null>(null)
   const [weightTableMissing, setWeightTableMissing] = useState(false)
@@ -71,7 +74,19 @@ export function TrendsHistory({ userId, goals }: { userId: string | null; goals:
 
   return (
     <section className="mt-6 px-4">
-      <h2 className="mb-2 text-subtitle text-text-primary">Trends & History</h2>
+      <div className="mb-2 flex items-center justify-between">
+        <h2 className="text-subtitle text-text-primary">Trends & History</h2>
+        {historyMeals && historyMeals.length > 0 && (
+          <button
+            onClick={() => setShowRecap(true)}
+            className="flex items-center gap-1.5 rounded-full border border-white/10 bg-bg-secondary px-3 py-1.5 text-caption text-text-secondary"
+          >
+            <Share2 size={13} /> Share your week
+          </button>
+        )}
+      </div>
+
+      {showRecap && <WeeklyRecapCard data={dayTotals} name={displayName} onClose={() => setShowRecap(false)} />}
 
       <div className="glass-card p-3">
         <p className="mb-2 text-caption uppercase tracking-wide text-text-tertiary">

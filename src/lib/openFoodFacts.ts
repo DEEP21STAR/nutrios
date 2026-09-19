@@ -16,6 +16,11 @@ export interface OffMacros {
   proteinPer100gG: number
   fatPer100gG: number
   carbsPer100gG: number
+  /** Optional — not every OFF product or common-food entry has these (verified against a real
+   * OFF product response before naming these fields: fiber_100g/sugars_100g are real, standard
+   * keys, not guessed). */
+  fiberPer100gG?: number
+  sugarPer100gG?: number
 }
 
 interface OffSearchResponse {
@@ -58,6 +63,8 @@ export async function lookupFoodMacros(query: string): Promise<OffMacros | null>
       proteinPer100gG: common.proteinPer100gG,
       fatPer100gG: common.fatPer100gG,
       carbsPer100gG: common.carbsPer100gG,
+      fiberPer100gG: common.fiberPer100gG,
+      sugarPer100gG: common.sugarPer100gG,
     }
   }
 
@@ -114,6 +121,8 @@ export async function lookupFoodMacros(query: string): Promise<OffMacros | null>
     proteinPer100gG: n['proteins_100g'] ?? 0,
     fatPer100gG: n['fat_100g'] ?? 0,
     carbsPer100gG: n['carbohydrates_100g'] ?? 0,
+    fiberPer100gG: n['fiber_100g'],
+    sugarPer100gG: n['sugars_100g'],
   }
   cacheFoodLookup(query, result)
   return result
@@ -127,5 +136,7 @@ export function scaleToPortion(off: OffMacros, grams: number) {
     proteinG: Math.round(off.proteinPer100gG * factor * 10) / 10,
     fatG: Math.round(off.fatPer100gG * factor * 10) / 10,
     carbsG: Math.round(off.carbsPer100gG * factor * 10) / 10,
+    fiberG: off.fiberPer100gG !== undefined ? Math.round(off.fiberPer100gG * factor * 10) / 10 : undefined,
+    sugarG: off.sugarPer100gG !== undefined ? Math.round(off.sugarPer100gG * factor * 10) / 10 : undefined,
   }
 }
