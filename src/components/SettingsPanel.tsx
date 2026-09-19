@@ -169,9 +169,18 @@ export function SettingsPanel({
           ) : (
             <>
               <p className="text-caption text-text-tertiary">
-                NUTRYOS stays free — Premium is donation-supported. Donation details aren't set up
-                yet; check back soon, or unlock now on trust.
+                NUTRYOS stays free — Premium is donation-supported. Buying a coffee genuinely
+                helps cover the AI vision costs and hosting, but it's still an honor system below —
+                no purchase required to unlock.
               </p>
+              <a
+                href="https://buymeacoffee.com/nutryos"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-xl border border-accent-energy/40 bg-accent-energy/10 py-3 text-center text-body font-semibold text-accent-energy"
+              >
+                Buy me a coffee
+              </a>
               <button
                 onClick={() => {
                   setPremiumUnlocked(true)
