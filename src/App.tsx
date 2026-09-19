@@ -41,6 +41,7 @@ function ScreenFallback() {
 }
 import { useRegisterSW } from 'virtual:pwa-register/react'
 import { getStoredTheme, applyTheme, type Theme } from '@/lib/theme'
+import { getStoredAccentColor, applyAccentColor, type AccentColor } from '@/lib/accentColor'
 import { identifyFoodViaOllama } from '@/lib/ollamaVision'
 import { identifyFoodViaGemini } from '@/lib/geminiVision'
 import { identifyFoodOnDevice, isWebGPUAvailable, type OnDeviceProgress } from '@/lib/onDeviceVision'
@@ -107,6 +108,7 @@ export default function App() {
   const [goals, setGoals] = useState<Goals | null>(null)
   const [needsOnboarding, setNeedsOnboarding] = useState(false)
   const [theme, setTheme] = useState<Theme>('dark')
+  const [accentColor, setAccentColor] = useState<AccentColor>('emerald')
   const [showSettings, setShowSettings] = useState(false)
   const [swRegistration, setSwRegistration] = useState<ServiceWorkerRegistration | undefined>(undefined)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
@@ -125,6 +127,8 @@ export default function App() {
     const stored = getStoredTheme()
     applyTheme(stored)
     setTheme(stored)
+    setAccentColor(getStoredAccentColor())
+    applyAccentColor(getStoredAccentColor())
   }, [])
 
   // PWA shortcut deep link ("Log a meal" on the home-screen icon's long-press menu, see
@@ -472,6 +476,8 @@ export default function App() {
           onClose={() => setShowSettings(false)}
           theme={theme}
           onThemeChange={setTheme}
+          accentColor={accentColor}
+          onAccentColorChange={setAccentColor}
           needRefresh={needRefresh}
           onUpdate={() => updateServiceWorker(true)}
           onCheckForUpdates={handleCheckForUpdates}

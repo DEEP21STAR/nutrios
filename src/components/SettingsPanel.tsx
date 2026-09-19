@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Images, Zap, Palette, Snowflake, Crown, ShieldCheck, Download, FlaskConical } from 'lucide-react'
 import { applyTheme, type Theme } from '@/lib/theme'
+import { applyAccentColor, ACCENT_PRESETS, type AccentColor } from '@/lib/accentColor'
 import { AvatarPicker } from '@/components/AvatarPicker'
 import { isPremiumUnlocked, setPremiumUnlocked } from '@/lib/premium'
 import { saveDisplayName } from '@/lib/avatarRepo'
@@ -20,6 +21,8 @@ interface SettingsPanelProps {
   onClose: () => void
   theme: Theme
   onThemeChange: (theme: Theme) => void
+  accentColor: AccentColor
+  onAccentColorChange: (accent: AccentColor) => void
   needRefresh: boolean
   onUpdate: () => void
   onCheckForUpdates: () => Promise<boolean>
@@ -40,6 +43,8 @@ export function SettingsPanel({
   onClose,
   theme,
   onThemeChange,
+  accentColor,
+  onAccentColorChange,
   needRefresh,
   onUpdate,
   onCheckForUpdates,
@@ -189,6 +194,31 @@ export function SettingsPanel({
                 {opt}
               </button>
             ))}
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <span className="text-caption text-text-tertiary">Accent color</span>
+            <div className="flex gap-3">
+              {(Object.keys(ACCENT_PRESETS) as AccentColor[]).map((key) => {
+                const preset = ACCENT_PRESETS[key]
+                return (
+                  <button
+                    key={key}
+                    onClick={() => {
+                      applyAccentColor(key)
+                      onAccentColorChange(key)
+                      flashToast(`${preset.label} accent saved`)
+                    }}
+                    aria-label={preset.label}
+                    className="grid h-10 w-10 place-items-center rounded-full transition-transform active:scale-90"
+                    style={{
+                      background: preset.hex,
+                      boxShadow: accentColor === key ? `0 0 0 3px var(--color-bg-secondary), 0 0 0 5px ${preset.hex}, 0 0 14px 2px ${preset.glow}` : 'none',
+                    }}
+                  />
+                )
+              })}
+            </div>
           </div>
         </section>
 
