@@ -2,7 +2,7 @@
 
 /*
  * ============================================================================
- * NUTRIOS design tokens — "Effortless Complexity" / "Cinematic Tech"
+ * NUTRYOS design tokens — "Effortless Complexity" / "Cinematic Tech"
  * Phase 1 foundation. Real Tailwind v4 CSS-first theme extension (@theme),
  * not inline magic numbers scattered through components. Every screen in
  * this app should pull colour/radius/type/spacing from here.
@@ -29,7 +29,7 @@
   /* Typography families */
   --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', monospace;
-  /* Wordmark only — the NUTRIOS logotype, not general UI text. A real display face with
+  /* Wordmark only — the NUTRYOS logotype, not general UI text. A real display face with
      character (angular, tech-native) instead of reusing Inter bold, which read as generic. */
   --font-display: 'Chakra Petch', var(--font-sans);
 
@@ -70,7 +70,7 @@
 }
 
 /*
- * Light theme — real, separate palette (not an auto-invert). NUTRIOS's "Cinematic Tech" identity
+ * Light theme — real, separate palette (not an auto-invert). NUTRYOS's "Cinematic Tech" identity
  * is dark-first by design, so this isn't trying to out-cinematic the dark mode; it's a genuinely
  * usable, legible light alternative for whoever wants it. Applied via `data-theme="light"` on
  * <html> (see lib/theme.ts) rather than a prefers-color-scheme media query, since this is a
@@ -275,7 +275,7 @@ body,
   padding: 22px 24px 20px;
   text-align: center;
   /* No margin-top here on purpose — this component is pinned to the bottom of a flex column via
-     the caller's own className (e.g. NUTRIOS passes "mt-auto"), and a hardcoded margin here
+     the caller's own className (e.g. NUTRYOS passes "mt-auto"), and a hardcoded margin here
      would fight that same property and win by source order, silently breaking the pin. Callers
      not using flex-push spacing should pass their own top-margin className instead. */
 }
@@ -458,7 +458,7 @@ body,
   letter-spacing: 1px;
 }
 /* The user's name inside "Built with care for <name>" — deliberately breaks from the
-   surrounding pink/white shimmer with NUTRIOS's own emerald, so a real name reads as the
+   surrounding pink/white shimmer with NUTRYOS's own emerald, so a real name reads as the
    personal, specific part of the line rather than blending into the generic brand copy. */
 .wfd-name {
   -webkit-text-fill-color: #00e5a0;

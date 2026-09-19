@@ -78,9 +78,9 @@ export function ProgressPhotos({ userId }: { userId: string }) {
     if (!url) return
     try {
       const blob = await fetch(url).then((r) => r.blob())
-      const file = new File([blob], `nutrios-progress-${photo.takenAt.slice(0, 10)}.jpg`, { type: blob.type })
+      const file = new File([blob], `nutryos-progress-${photo.takenAt.slice(0, 10)}.jpg`, { type: blob.type })
       if (navigator.share && navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ files: [file], title: 'My NUTRIOS progress' })
+        await navigator.share({ files: [file], title: 'My NUTRYOS progress' })
       } else {
         // No Web Share support (most desktop browsers) — open it in a new tab so Deep can
         // still save/send it manually, rather than failing silently.

@@ -17,7 +17,7 @@ const WORDMARK_LETTERS = [
   { ch: 'U', color: '#00d4c4' },
   { ch: 'T', color: '#10d8ff' },
   { ch: 'R', color: '#8b5cf6' },
-  { ch: 'I', color: '#c040ff' },
+  { ch: 'Y', color: '#c040ff' },
 ]
 const RING_COLOR = '#00e5a0'
 const S_COLOR = '#ffb800'

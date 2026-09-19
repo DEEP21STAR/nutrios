@@ -169,7 +169,7 @@ export function SettingsPanel({
           ) : (
             <>
               <p className="text-caption text-text-tertiary">
-                NUTRIOS stays free — Premium is donation-supported. Donation details aren't set up
+                NUTRYOS stays free — Premium is donation-supported. Donation details aren't set up
                 yet; check back soon, or unlock now on trust.
               </p>
               <button

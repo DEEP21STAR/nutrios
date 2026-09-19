@@ -3,7 +3,7 @@ import gsap from 'gsap'
 import { cn, prefersReducedMotion } from '@/lib/utils'
 
 /**
- * NUTRIOS "Fluid Ring" — real SVG arc (stroke-dasharray/dashoffset), GSAP
+ * NUTRYOS "Fluid Ring" — real SVG arc (stroke-dasharray/dashoffset), GSAP
  * elastic fill animation on first mount, smooth ease on subsequent updates.
  * Glow colour is fully caller-driven (see TodayRing's amber/crimson
  * threshold logic) so this component stays a generic, reusable ring rather

@@ -3,8 +3,8 @@
  * real brand colors (cyan/purple) as the live Clarity dashboard (see the
  * .wfd-* rules in index.css for the ported animation itself). This is the
  * company brand mark, not an app-themed element, so it deliberately does
- * NOT use NUTRIOS's own emerald/violet tokens.
- * NUTRIOS has no third-party client the way Clarity (Mimi) or Voyager
+ * NOT use NUTRYOS's own emerald/violet tokens.
+ * NUTRYOS has no third-party client the way Clarity (Mimi) or Voyager
  * (Sachind) do, so the "built with care for" line reads generically.
  */
 export function WhetuFooter({ className, name }: { className?: string; name?: string | null }) {
@@ -20,7 +20,7 @@ export function WhetuFooter({ className, name }: { className?: string; name?: st
         Built with care for <span className="wfd-name">{name?.trim() || 'you'}</span>{' '}
         <span className="wfd-heart">♥</span>
       </span>
-      <span className="wfd-badge">NUTRIOS · Whetū Digital {new Date().getFullYear()}</span>
+      <span className="wfd-badge">NUTRYOS · Whetū Digital {new Date().getFullYear()}</span>
     </div>
   )
 }

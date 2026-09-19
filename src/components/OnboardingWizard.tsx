@@ -3,7 +3,7 @@ import { TodayRing } from '@/components/TodayRing'
 import { calculateGoals, type ActivityLevel, type GoalDirection, type OnboardingAnswers, type Sex } from '@/lib/bmr'
 import type { Goals } from '@/lib/types'
 
-const STEPS = ['sex', 'age', 'height', 'weight', 'target', 'activity', 'goal', 'review'] as const
+const STEPS = ['name', 'sex', 'age', 'height', 'weight', 'target', 'activity', 'goal', 'review'] as const
 type Step = (typeof STEPS)[number]
 
 const ACTIVITY_OPTIONS: { value: ActivityLevel; label: string; hint: string }[] = [
@@ -17,14 +17,15 @@ const ACTIVITY_OPTIONS: { value: ActivityLevel; label: string; hint: string }[] 
  * First-run setup wizard — real Mifflin-St Jeor BMR/TDEE calculation (see
  * lib/bmr.ts), not a placeholder. Shown once, before the main app, when no
  * `goals` row exists yet for this user (checked in App.tsx). Same visual
- * language as the rest of NUTRIOS (glass cards, starfield behind, neon
+ * language as the rest of NUTRYOS (glass cards, starfield behind, neon
  * ring) rather than a generic form — the final step renders the exact same
  * TodayRing component the user sees every day after this, filled with
  * their real computed targets, so onboarding ends on the object it was
  * building toward the whole time.
  */
-export function OnboardingWizard({ onComplete }: { onComplete: (goals: Goals) => void }) {
+export function OnboardingWizard({ onComplete }: { onComplete: (goals: Goals, name: string) => void }) {
   const [stepIndex, setStepIndex] = useState(0)
+  const [name, setName] = useState('')
   const [sex, setSex] = useState<Sex | null>(null)
   const [age, setAge] = useState('')
   const [heightCm, setHeightCm] = useState('')
@@ -72,6 +73,9 @@ export function OnboardingWizard({ onComplete }: { onComplete: (goals: Goals) =>
   }
 
   const canAdvance: Record<Step, boolean> = {
+    // Skippable on purpose — WhetuFooter already falls back to "you" when this is blank, so a
+    // name shouldn't gate access to the rest of onboarding the way the BMR-required fields do.
+    name: true,
     sex: sex !== null,
     age: parseFloat(age) > 0 && parseFloat(age) < 120,
     height: parseFloat(heightCm) > 50 && parseFloat(heightCm) < 260,
@@ -97,6 +101,24 @@ export function OnboardingWizard({ onComplete }: { onComplete: (goals: Goals) =>
       </div>
 
       <div className="mx-4 mt-6 flex flex-1 flex-col">
+        {step === 'name' && (
+          <StepCard title="What should we call you?" subtitle="Shows up in the little signature at the bottom of your screen — totally optional.">
+            <input
+              type="text"
+              enterKeyHint="next"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') next()
+              }}
+              placeholder="Your name"
+              maxLength={40}
+              autoFocus
+              className="rounded-xl border border-white/10 bg-bg-secondary px-4 py-3 text-body text-text-primary outline-none focus:border-accent-health placeholder:text-text-tertiary"
+            />
+          </StepCard>
+        )}
+
         {step === 'sex' && (
           <StepCard title="Let's personalize your plan" subtitle="This helps us calculate your real daily energy needs.">
             <div className="grid grid-cols-2 gap-3">
@@ -188,11 +210,11 @@ export function OnboardingWizard({ onComplete }: { onComplete: (goals: Goals) =>
           </button>
         )}
         <button
-          onClick={() => (step === 'review' ? computedGoals && onComplete(computedGoals) : next())}
+          onClick={() => (step === 'review' ? computedGoals && onComplete(computedGoals, name.trim()) : next())}
           disabled={!canAdvance[step]}
           className="flex-1 rounded-xl bg-accent-health py-3 text-body font-semibold text-bg-primary disabled:opacity-30"
         >
-          {step === 'review' ? 'Start using NUTRIOS' : 'Continue'}
+          {step === 'review' ? 'Start using NUTRYOS' : 'Continue'}
         </button>
       </div>
     </div>

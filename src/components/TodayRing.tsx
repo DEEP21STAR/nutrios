@@ -18,7 +18,7 @@ export function ringColorForRemaining(remainingPct: number): string {
 }
 
 /**
- * NUTRIOS Dashboard Fluid Ring — Today screen's calorie ring + 3 nested
+ * NUTRYOS Dashboard Fluid Ring — Today screen's calorie ring + 3 nested
  * macro rings. Restyled visual layer only: same RadialProgress (SVG
  * stroke-dasharray/dashoffset, now GSAP elastic-fill) and CountUp (kinetic
  * digit count-up) components, same totals/goals data model.

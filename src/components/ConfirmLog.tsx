@@ -19,7 +19,7 @@ function tick() {
 
 /**
  * Core-loop step 4: editable confirm-before-log step, restyled to the
- * NUTRIOS glass verification screen. The vision model + Open Food Facts
+ * NUTRYOS glass verification screen. The vision model + Open Food Facts
  * lookup pre-fill everything, but nothing is logged until the user taps
  * confirm — every field (name, grams, and the derived macros) is still
  * editable in case identification or the macro lookup was wrong. This is

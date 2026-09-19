@@ -29,10 +29,10 @@ export default defineConfig({
     __BUILD_NUMBER__: JSON.stringify(buildNumber),
     __COMMIT_HASH__: JSON.stringify(commitHash),
   },
-  // Served as a GitHub Pages project site at deep21star.github.io/nutrios/,
+  // Served as a GitHub Pages project site at deep21star.github.io/nutryos/,
   // not the domain root — every asset/manifest path needs this prefix or
   // the built JS/CSS 404s in production.
-  base: '/nutrios/',
+  base: '/nutryos/',
   plugins: [
     react(),
     tailwindcss(),
@@ -40,14 +40,14 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg'],
       manifest: {
-        name: 'NUTRIOS',
-        short_name: 'NUTRIOS',
-        description: 'Snap a photo. NUTRIOS reads your meal and fills the ring instantly.',
+        name: 'NUTRYOS',
+        short_name: 'NUTRYOS',
+        description: 'Snap a photo. NUTRYOS reads your meal and fills the ring instantly.',
         theme_color: '#0A0A0F',
         background_color: '#0A0A0F',
         display: 'standalone',
-        start_url: '/nutrios/',
-        scope: '/nutrios/',
+        start_url: '/nutryos/',
+        scope: '/nutryos/',
         icons: [
           { src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png' },
           { src: 'pwa-512x512.png', sizes: '512x512', type: 'image/png' },
@@ -61,7 +61,7 @@ export default defineConfig({
             name: 'Log a meal',
             short_name: 'Log meal',
             description: 'Jump straight into the camera to log a meal',
-            url: '/nutrios/?action=log-meal',
+            url: '/nutryos/?action=log-meal',
             icons: [{ src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png' }],
           },
         ],

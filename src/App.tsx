@@ -29,7 +29,7 @@ import { hapticSuccess, hapticCelebrate } from '@/lib/haptics'
 import { ensureAuthenticated } from '@/lib/auth'
 import { insertMeal, listTodayMeals, subscribeToMeals } from '@/lib/mealsRepo'
 import { fetchGoals, saveGoals } from '@/lib/goalsRepo'
-import { fetchAvatarUrl, fetchDisplayName } from '@/lib/avatarRepo'
+import { fetchAvatarUrl, fetchDisplayName, saveDisplayName } from '@/lib/avatarRepo'
 import { sumMacros, DEFAULT_GOALS, type FoodItem, type Goals, type Meal } from '@/lib/types'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 
@@ -315,9 +315,10 @@ export default function App() {
     }
   }
 
-  async function handleOnboardingComplete(newGoals: Goals) {
+  async function handleOnboardingComplete(newGoals: Goals, name: string) {
     setGoals(newGoals)
     setNeedsOnboarding(false)
+    if (name) setDisplayName(name)
     if (userId) {
       try {
         await saveGoals(userId, newGoals)
@@ -325,6 +326,13 @@ export default function App() {
         // Real goals are already in state and the app is usable either way — a failed write just
         // means this device's answers won't persist across reloads/devices yet, not a blocker.
         setStatusMessage(err instanceof Error ? err.message : 'Could not save your goals to Supabase.')
+      }
+      if (name) {
+        try {
+          await saveDisplayName(userId, name)
+        } catch (err) {
+          setStatusMessage(err instanceof Error ? err.message : 'Could not save your name to Supabase.')
+        }
       }
     }
   }

@@ -4,7 +4,7 @@ import { cn, prefersReducedMotion } from '@/lib/utils'
 import { hapticTap } from '@/lib/haptics'
 
 /**
- * NUTRIOS Input Orb — collapsed state. 64px floating glassmorphic button
+ * NUTRYOS Input Orb — collapsed state. 64px floating glassmorphic button
  * with a GSAP breathing loop (an idle "it's alive" cue, not CSS keyframes,
  * so it can be killed cleanly and is trivially gated by
  * prefers-reduced-motion). This is the ONLY entry point into Photo mode.
@@ -46,7 +46,7 @@ export function InputOrbButton({ onClick }: { onClick: () => void }) {
 }
 
 /**
- * NUTRIOS's own camera "lens" — the branded viewfinder treatment Deep asked for so opening the
+ * NUTRYOS's own camera "lens" — the branded viewfinder treatment Deep asked for so opening the
  * camera feels like part of this app, not a generic file picker. Emerald corner brackets (same
  * bracket/tag visual language reused for real detected items on the confirm screen) plus a real
  * GSAP-driven scan-line that sweeps top-to-bottom on a loop while the shutter is live, and a
@@ -146,7 +146,7 @@ function UploadOptions({ onFile }: { onFile: (e: React.ChangeEvent<HTMLInputElem
  * permission denied in a PWA context, etc.), not a hypothetical, so the
  * fallback is a first-class path rather than an error dead-end.
  *
- * Visual layer only, restyled to the NUTRIOS Cinematic Tech spec: the panel
+ * Visual layer only, restyled to the NUTRYOS Cinematic Tech spec: the panel
  * enters with a GSAP elastic-spring expansion from the orb's position
  * (skipped for prefers-reduced-motion, which gets a plain 200ms fade
  * instead), and Cancel plays the same spring in reverse before actually
