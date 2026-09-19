@@ -160,40 +160,58 @@ export default function App() {
     let channel: RealtimeChannel | null = null
     let cancelled = false
 
+    async function runBootstrap() {
+      const user = await ensureAuthenticated()
+      if (cancelled) return
+      setUserId(user.id)
+
+      const today = await listTodayMeals(user.id)
+      if (cancelled) return
+      setMeals(today)
+
+      channel = subscribeToMeals(user.id, (meal) => {
+        setMeals((prev) => (prev.some((m) => m.id === meal.id) ? prev : [...prev, meal]))
+      })
+
+      // The `goals` table has existed since the very first migration, but nothing ever read
+      // or wrote it until the onboarding wizard — every screen used DEFAULT_GOALS regardless
+      // of who was using the app. A missing row means this user genuinely hasn't onboarded yet.
+      const savedGoals = await fetchGoals(user.id)
+      if (cancelled) return
+      if (savedGoals) {
+        setGoals(savedGoals)
+      } else {
+        setNeedsOnboarding(true)
+      }
+
+      const savedAvatar = await fetchAvatarUrl(user.id)
+      if (cancelled) return
+      setAvatarUrl(savedAvatar)
+
+      const savedName = await fetchDisplayName(user.id)
+      if (cancelled) return
+      setDisplayName(savedName)
+    }
+
+    // A single transient failure here (a brief network blip, or a genuinely-observed Supabase
+    // auth clock-skew edge case — "JWT issued at future" on a freshly-minted anonymous token)
+    // used to abort the entire bootstrap permanently: needsOnboarding stayed false, goals stayed
+    // null, and the user was stranded on a default-goals dashboard with just an error banner and
+    // no way back short of knowing to manually reload. One retry after a short delay recovers
+    // from exactly this kind of blip without needing the user to do anything.
     async function bootstrap() {
+      setAuthError(null)
       try {
-        const user = await ensureAuthenticated()
+        await runBootstrap()
+      } catch {
         if (cancelled) return
-        setUserId(user.id)
-
-        const today = await listTodayMeals(user.id)
+        await new Promise((r) => setTimeout(r, 1000))
         if (cancelled) return
-        setMeals(today)
-
-        channel = subscribeToMeals(user.id, (meal) => {
-          setMeals((prev) => (prev.some((m) => m.id === meal.id) ? prev : [...prev, meal]))
-        })
-
-        // The `goals` table has existed since the very first migration, but nothing ever read
-        // or wrote it until the onboarding wizard — every screen used DEFAULT_GOALS regardless
-        // of who was using the app. A missing row means this user genuinely hasn't onboarded yet.
-        const savedGoals = await fetchGoals(user.id)
-        if (cancelled) return
-        if (savedGoals) {
-          setGoals(savedGoals)
-        } else {
-          setNeedsOnboarding(true)
+        try {
+          await runBootstrap()
+        } catch (err) {
+          if (!cancelled) setAuthError(err instanceof Error ? err.message : 'Supabase sign-in failed.')
         }
-
-        const savedAvatar = await fetchAvatarUrl(user.id)
-        if (cancelled) return
-        setAvatarUrl(savedAvatar)
-
-        const savedName = await fetchDisplayName(user.id)
-        if (cancelled) return
-        setDisplayName(savedName)
-      } catch (err) {
-        if (!cancelled) setAuthError(err instanceof Error ? err.message : 'Supabase sign-in failed.')
       }
     }
     bootstrap()
@@ -437,7 +455,14 @@ export default function App() {
         <h1 className="text-title">
           {activeTab === 'today' ? 'Today' : activeTab === 'progress' ? 'Progress' : 'Together'}
         </h1>
-        {authError && <p className="mt-1 text-caption text-accent-danger">{authError}</p>}
+        {authError && (
+          <p className="mt-1 text-caption text-accent-danger">
+            {authError}{' '}
+            <button onClick={() => window.location.reload()} className="underline">
+              Retry
+            </button>
+          </p>
+        )}
         {statusMessage && <p className="mt-1 text-caption text-text-tertiary">{statusMessage}</p>}
       </header>
 
