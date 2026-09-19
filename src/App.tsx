@@ -1,6 +1,5 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { CameraCapture, InputOrbButton } from '@/components/CameraCapture'
-import { VoiceCapture } from '@/components/VoiceCapture'
 import { MenuCapture } from '@/components/MenuCapture'
 import { BarcodeCapture } from '@/components/BarcodeCapture'
 import { ConfirmLog } from '@/components/ConfirmLog'
@@ -13,15 +12,33 @@ import { WorkoutTracker } from '@/components/WorkoutTracker'
 import { MealTimeline } from '@/components/MealTimeline'
 import { TipsTicker } from '@/components/TipsTicker'
 import { Achievements } from '@/components/Achievements'
-import { TogetherMode } from '@/components/TogetherMode'
 import { TrendsHistory } from '@/components/TrendsHistory'
-import { ProgressPhotos } from '@/components/ProgressPhotos'
 import { TabBar, type TabKey } from '@/components/TabBar'
 import { WhetuFooter } from '@/components/WhetuFooter'
 import { SplashScreen } from '@/components/SplashScreen'
 import { OnboardingWizard } from '@/components/OnboardingWizard'
-import { SettingsPanel } from '@/components/SettingsPanel'
 import { SettingsMenuButton } from '@/components/SettingsMenuButton'
+
+// Code-split the heavy, not-always-visible screens — these five are the largest files in the
+// app after App.tsx itself, and were previously all precached into the main bundle even though
+// most sessions never open Settings, Together mode, or Progress photos. Named exports (not
+// default), so each needs the .then() unwrap — React.lazy only accepts a `{ default }` shape.
+const VoiceCapture = lazy(() => import('@/components/VoiceCapture').then((m) => ({ default: m.VoiceCapture })))
+const TogetherMode = lazy(() => import('@/components/TogetherMode').then((m) => ({ default: m.TogetherMode })))
+const ProgressPhotos = lazy(() => import('@/components/ProgressPhotos').then((m) => ({ default: m.ProgressPhotos })))
+const SettingsPanel = lazy(() => import('@/components/SettingsPanel').then((m) => ({ default: m.SettingsPanel })))
+
+/** Minimal, theme-matched placeholder while a lazy screen's chunk downloads. */
+function ScreenFallback() {
+  return (
+    <div className="flex flex-1 items-center justify-center py-16">
+      <div
+        className="h-8 w-8 animate-spin rounded-full border-2 border-white/10"
+        style={{ borderTopColor: 'var(--color-accent-health)' }}
+      />
+    </div>
+  )
+}
 import { useRegisterSW } from 'virtual:pwa-register/react'
 import { getStoredTheme, applyTheme, type Theme } from '@/lib/theme'
 import { identifyFoodViaOllama } from '@/lib/ollamaVision'
@@ -425,6 +442,7 @@ export default function App() {
       </header>
 
       {showSettings && (
+        <Suspense fallback={<ScreenFallback />}>
         <SettingsPanel
           onClose={() => setShowSettings(false)}
           theme={theme}
@@ -438,6 +456,7 @@ export default function App() {
           displayName={displayName}
           onDisplayNameChange={setDisplayName}
         />
+        </Suspense>
       )}
 
       {/* Tabbed layout (2026-09-17) — was one continuous scroll through every section
@@ -474,12 +493,18 @@ export default function App() {
           <TrendsHistory userId={userId} goals={goals ?? DEFAULT_GOALS} displayName={displayName} />
           {/* Progress photos — private timeline + before/after compare + share, its own
               top-level section matching Achievements/TrendsHistory's pattern. */}
-          {userId && <ProgressPhotos userId={userId} onOpenSettings={() => setShowSettings(true)} />}
+          {userId && (
+            <Suspense fallback={<ScreenFallback />}>
+              <ProgressPhotos userId={userId} onOpenSettings={() => setShowSettings(true)} />
+            </Suspense>
+          )}
         </>
       )}
 
       {activeTab === 'together' && (
-        <TogetherMode meals={meals} goals={goals ?? DEFAULT_GOALS} avatarUrl={avatarUrl} userId={userId} />
+        <Suspense fallback={<ScreenFallback />}>
+          <TogetherMode meals={meals} goals={goals ?? DEFAULT_GOALS} avatarUrl={avatarUrl} userId={userId} />
+        </Suspense>
       )}
 
       {/* mt-auto pins this to the bottom of the flex column regardless of how tall each tab's
@@ -505,7 +530,9 @@ export default function App() {
       {stage === 'camera' && <CameraCapture onCapture={handleCapture} onCancel={() => setStage('idle')} />}
 
       {stage === 'voice' && (
-        <VoiceCapture onResolved={handleVoiceResolved} onCancel={() => setStage('idle')} />
+        <Suspense fallback={<ScreenFallback />}>
+          <VoiceCapture onResolved={handleVoiceResolved} onCancel={() => setStage('idle')} />
+        </Suspense>
       )}
 
       {stage === 'menu' && (

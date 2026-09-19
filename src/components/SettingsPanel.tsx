@@ -6,6 +6,7 @@ import { isPremiumUnlocked, setPremiumUnlocked } from '@/lib/premium'
 import { saveDisplayName } from '@/lib/avatarRepo'
 import { isAnonymousAccount, isGoogleLinked, linkGoogleAccount } from '@/lib/accountLink'
 import { downloadJson, exportUserData } from '@/lib/dataExport'
+import { LegalPage } from '@/components/LegalPage'
 
 const PREMIUM_FEATURES = [
   { Icon: Images, text: 'Full progress-photo history (free: most recent 10)' },
@@ -102,6 +103,7 @@ export function SettingsPanel({
   }
 
   const [premium, setPremium] = useState(isPremiumUnlocked)
+  const [showLegal, setShowLegal] = useState(false)
 
   async function handleCheck() {
     setCheckState('checking')
@@ -318,8 +320,27 @@ export function SettingsPanel({
                   : 'Check for updates'}
             </button>
           )}
+
+          <a
+            href="mailto:hello@whetudigital.co.nz"
+            className="rounded-xl border border-white/10 bg-bg-secondary py-3 text-center text-body text-text-secondary"
+          >
+            Contact / feedback
+          </a>
+        </section>
+
+        <section className="glass-card flex flex-col gap-3 p-4">
+          <h3 className="text-body font-semibold">Legal</h3>
+          <button
+            onClick={() => setShowLegal(true)}
+            className="rounded-xl border border-white/10 bg-bg-secondary py-3 text-body text-text-secondary"
+          >
+            Privacy Policy &amp; Terms of Use
+          </button>
         </section>
       </div>
+
+      {showLegal && <LegalPage onClose={() => setShowLegal(false)} />}
 
       {toast && (
         <div className="pointer-events-none fixed inset-x-0 bottom-8 z-20 flex justify-center px-4">
