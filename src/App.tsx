@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { CameraCapture, InputOrbButton } from '@/components/CameraCapture'
 import { VoiceCapture } from '@/components/VoiceCapture'
 import { MenuCapture } from '@/components/MenuCapture'
+import { BarcodeCapture } from '@/components/BarcodeCapture'
 import { ConfirmLog } from '@/components/ConfirmLog'
 import { TodayRing } from '@/components/TodayRing'
 import { HealthyScoreGauge } from '@/components/HealthyScoreGauge'
@@ -35,7 +36,7 @@ import { fetchAvatarUrl, fetchDisplayName, saveDisplayName } from '@/lib/avatarR
 import { sumMacros, DEFAULT_GOALS, type FoodItem, type Goals, type Meal } from '@/lib/types'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 
-type Stage = 'idle' | 'mode-select' | 'camera' | 'voice' | 'menu' | 'identifying' | 'confirm' | 'logging'
+type Stage = 'idle' | 'mode-select' | 'camera' | 'voice' | 'menu' | 'barcode' | 'identifying' | 'confirm' | 'logging'
 
 /**
  * Core loop, now backed by the real, live Supabase project
@@ -70,6 +71,10 @@ export default function App() {
   // menu-mode). Reset alongside draftItems/capturedPhoto in every path that leaves 'confirm'.
   const [draftIsEatingOut, setDraftIsEatingOut] = useState(false)
   const [draftRestaurantName, setDraftRestaurantName] = useState('')
+  // Only meaningfully distinguishes 'voice' vs 'barcode' -- both are the no-photo cases
+  // ConfirmLog needs to tell apart (see ConfirmLog.tsx's own logSource prop comment). Photo/menu
+  // paths always carry a real photo, so this is never consulted for those.
+  const [draftLogSource, setDraftLogSource] = useState<'voice' | 'barcode'>('voice')
   const [meals, setMeals] = useState<Meal[]>([])
   const [statusMessage, setStatusMessage] = useState<string | null>(null)
   const [userId, setUserId] = useState<string | null>(null)
@@ -268,6 +273,19 @@ export default function App() {
     setDraftItems(items)
     setDraftIsEatingOut(false)
     setDraftRestaurantName('')
+    setDraftLogSource('voice')
+    setStage('confirm')
+  }
+
+  /** Same shape as handleVoiceResolved -- a barcode scan resolves straight to a real FoodItem
+   * with no AI/identifying step involved (see BarcodeCapture.tsx), so it goes straight to confirm
+   * the same way. */
+  function handleBarcodeResolved(items: FoodItem[]) {
+    setCapturedPhoto(null)
+    setDraftItems(items)
+    setDraftIsEatingOut(false)
+    setDraftRestaurantName('')
+    setDraftLogSource('barcode')
     setStage('confirm')
   }
 
@@ -435,6 +453,7 @@ export default function App() {
           onPhoto={() => setStage('camera')}
           onVoice={() => setStage('voice')}
           onMenu={() => setStage('menu')}
+          onBarcode={() => setStage('barcode')}
           onCancel={() => setStage('idle')}
         />
       )}
@@ -447,6 +466,10 @@ export default function App() {
 
       {stage === 'menu' && (
         <MenuCapture onResolved={handleMenuResolved} onCancel={() => setStage('idle')} />
+      )}
+
+      {stage === 'barcode' && (
+        <BarcodeCapture onResolved={handleBarcodeResolved} onCancel={() => setStage('idle')} />
       )}
 
       {stage === 'identifying' && capturedPhoto && (
@@ -467,6 +490,7 @@ export default function App() {
           pastMeals={meals}
           initialIsEatingOut={draftIsEatingOut}
           initialRestaurantName={draftRestaurantName}
+          logSource={draftLogSource}
           todaysTotals={totals}
           goals={goals ?? DEFAULT_GOALS}
           identificationNote={statusMessage}
@@ -513,11 +537,13 @@ function InputModeSheet({
   onPhoto,
   onVoice,
   onMenu,
+  onBarcode,
   onCancel,
 }: {
   onPhoto: () => void
   onVoice: () => void
   onMenu: () => void
+  onBarcode: () => void
   onCancel: () => void
 }) {
   return (
@@ -541,6 +567,12 @@ function InputModeSheet({
           className="glass flex items-center justify-center gap-2 rounded-full px-6 py-3 text-subtitle font-semibold text-accent-energy shadow-[0_0_24px_4px_var(--glow-energy)] transition active:scale-95"
         >
           <span aria-hidden>🍽️</span> Eating Out
+        </button>
+        <button
+          onClick={onBarcode}
+          className="glass flex items-center justify-center gap-2 rounded-full px-6 py-3 text-subtitle font-semibold text-text-primary shadow-[0_0_24px_4px_rgb(255_255_255/0.15)] transition active:scale-95"
+        >
+          <span aria-hidden>📦</span> Barcode
         </button>
         <button onClick={onCancel} className="mt-1 text-caption text-text-tertiary underline">
           Cancel

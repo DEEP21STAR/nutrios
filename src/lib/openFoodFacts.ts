@@ -128,6 +128,44 @@ export async function lookupFoodMacros(query: string): Promise<OffMacros | null>
   return result
 }
 
+/**
+ * Direct barcode lookup — the real OFF v2 product endpoint, exact-match by code rather than the
+ * fuzzy free-text search used by lookupFoodMacros. Verified against real live responses before
+ * writing this (a valid barcode returns `status:1` + a `product` object; an unknown/invalid one
+ * returns `status:0` with no `product` key at all — HTTP 200 either way, "not found" is never an
+ * HTTP error here). Used by BarcodeCapture.tsx.
+ */
+export async function lookupByBarcode(barcode: string): Promise<OffMacros | null> {
+  const url = `https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(
+    barcode,
+  )}.json?fields=code,product_name,product_name_en,nutriments`
+
+  let res = await fetch(url)
+  if (!res.ok && res.status >= 500) {
+    await new Promise((r) => setTimeout(r, 1500))
+    res = await fetch(url)
+  }
+  if (!res.ok) throw new Error(`Open Food Facts request failed: ${res.status}`)
+
+  const data = (await res.json()) as {
+    status?: number
+    product?: { code?: string; product_name?: string; product_name_en?: string; nutriments?: Record<string, number> }
+  }
+  if (data.status !== 1 || !data.product?.nutriments) return null
+
+  const n = data.product.nutriments
+  return {
+    code: data.product.code ?? barcode,
+    productName: data.product.product_name_en || data.product.product_name || `Barcode ${barcode}`,
+    caloriesPer100g: n['energy-kcal_100g'] ?? 0,
+    proteinPer100gG: n['proteins_100g'] ?? 0,
+    fatPer100gG: n['fat_100g'] ?? 0,
+    carbsPer100gG: n['carbohydrates_100g'] ?? 0,
+    fiberPer100gG: n['fiber_100g'],
+    sugarPer100gG: n['sugars_100g'],
+  }
+}
+
 /** Scales a per-100g macro profile to an estimated portion size in grams. */
 export function scaleToPortion(off: OffMacros, grams: number) {
   const factor = grams / 100

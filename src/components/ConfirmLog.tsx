@@ -40,12 +40,16 @@ export function ConfirmLog({
   todaysTotals,
   goals,
   identificationNote = null,
+  logSource = 'voice',
   onConfirm,
   onCancel,
 }: {
-  /** Null for a voice-logged meal — there's no photo to show, so the photo
-   * block below renders a violet "voice" placeholder instead of an <img>. */
+  /** Null for a voice-logged OR barcode-scanned meal — neither has a captured photo, so the photo
+   * block below renders a source-appropriate placeholder instead of an <img>. Defaults to 'voice'
+   * so every existing call site (which really is always voice today) needs no change; only the
+   * new barcode path passes 'barcode' explicitly. */
   photoDataUrl: string | null
+  logSource?: 'voice' | 'barcode'
   initialItems: FoodItem[]
   /** Already-logged meals (App.tsx's real Supabase-backed state), used only for the client-side
    * "you usually get X here" repeat-visit lookup (Phase 3, item 5) — no new query, no mutation. */
@@ -142,6 +146,16 @@ export function ConfirmLog({
             alt="Captured meal"
             className="max-h-[420px] w-full rounded-lg bg-bg-tertiary object-contain"
           />
+        ) : logSource === 'barcode' ? (
+          // Barcode-scanned meal — no photo exists, and it isn't voice either. Same "no photo,
+          // real reason why" pattern as the voice placeholder below, just its own icon/color/
+          // label so it doesn't misreport how this item was actually logged.
+          <div className="glass-card flex h-32 w-full items-center justify-center gap-2 text-accent-health shadow-[0_0_24px_4px_var(--glow-health)]">
+            <span className="text-2xl" aria-hidden>
+              📦
+            </span>
+            <span className="text-body">Logged from barcode</span>
+          </div>
         ) : (
           // Voice-logged meal — no photo exists. Same violet AI glow language
           // as the Input Orb's voice option, not a blank/broken-image look.
