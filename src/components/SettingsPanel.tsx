@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Images, Zap, Palette, Snowflake, Crown, ShieldCheck, Download } from 'lucide-react'
+import { Images, Zap, Palette, Snowflake, Crown, ShieldCheck, Download, FlaskConical } from 'lucide-react'
 import { applyTheme, type Theme } from '@/lib/theme'
 import { AvatarPicker } from '@/components/AvatarPicker'
 import { isPremiumUnlocked, setPremiumUnlocked } from '@/lib/premium'
@@ -10,6 +10,7 @@ import { downloadJson, exportUserData } from '@/lib/dataExport'
 const PREMIUM_FEATURES = [
   { Icon: Images, text: 'Full progress-photo history (free: most recent 10)' },
   { Icon: Snowflake, text: 'Bank up to 3 streak freezes (free: 1)' },
+  { Icon: FlaskConical, text: 'Full micronutrient breakdown (free: 4 key nutrients)' },
   { Icon: Zap, text: 'Priority AI food recognition' },
   { Icon: Palette, text: 'Custom app themes as they ship' },
 ]

@@ -7,6 +7,9 @@ import { ConfirmLog } from '@/components/ConfirmLog'
 import { TodayRing } from '@/components/TodayRing'
 import { HealthyScoreGauge } from '@/components/HealthyScoreGauge'
 import { StreakBanner } from '@/components/StreakBanner'
+import { WaterTracker } from '@/components/WaterTracker'
+import { RecentMeals } from '@/components/RecentMeals'
+import { WorkoutTracker } from '@/components/WorkoutTracker'
 import { MealTimeline } from '@/components/MealTimeline'
 import { TipsTicker } from '@/components/TipsTicker'
 import { Achievements } from '@/components/Achievements'
@@ -34,6 +37,7 @@ import { insertMeal, listTodayMeals, subscribeToMeals } from '@/lib/mealsRepo'
 import { fetchGoals, saveGoals } from '@/lib/goalsRepo'
 import { fetchAvatarUrl, fetchDisplayName, saveDisplayName } from '@/lib/avatarRepo'
 import { sumMacros, DEFAULT_GOALS, type FoodItem, type Goals, type Meal } from '@/lib/types'
+import { uid } from '@/lib/utils'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 
 type Stage = 'idle' | 'mode-select' | 'camera' | 'voice' | 'menu' | 'barcode' | 'identifying' | 'confirm' | 'logging'
@@ -74,8 +78,9 @@ export default function App() {
   // Only meaningfully distinguishes 'voice' vs 'barcode' -- both are the no-photo cases
   // ConfirmLog needs to tell apart (see ConfirmLog.tsx's own logSource prop comment). Photo/menu
   // paths always carry a real photo, so this is never consulted for those.
-  const [draftLogSource, setDraftLogSource] = useState<'voice' | 'barcode'>('voice')
+  const [draftLogSource, setDraftLogSource] = useState<'voice' | 'barcode' | 'repeat'>('voice')
   const [meals, setMeals] = useState<Meal[]>([])
+  const [caloriesBurned, setCaloriesBurned] = useState(0)
   const [statusMessage, setStatusMessage] = useState<string | null>(null)
   const [userId, setUserId] = useState<string | null>(null)
   const [authError, setAuthError] = useState<string | null>(null)
@@ -289,6 +294,37 @@ export default function App() {
     setStage('confirm')
   }
 
+  /** RecentMeals.tsx's long-press path -- re-log a past meal but land on the confirm screen
+   * first so portion/items can actually be adjusted, rather than blindly repeating whatever was
+   * logged last time. */
+  function handleRepeatForEdit(items: FoodItem[]) {
+    setCapturedPhoto(null)
+    setDraftItems(items.map((it) => ({ ...it, id: uid() })))
+    setDraftIsEatingOut(false)
+    setDraftRestaurantName('')
+    setDraftLogSource('repeat')
+    setStage('confirm')
+  }
+
+  /** RecentMeals.tsx's tap path -- genuinely one-tap re-log, no confirm screen, matching the
+   * explicit "effortless" priority for a meal someone's already logged (and edited/confirmed)
+   * before. Same real insert + state-update + celebration as handleConfirm, just skipping the
+   * confirm screen this one time since there's nothing new to confirm. */
+  async function handleQuickLog(items: FoodItem[]) {
+    if (!userId) {
+      setStatusMessage('Not signed in to Supabase yet — cannot log this meal.')
+      return
+    }
+    try {
+      const savedMeal = await insertMeal(userId, null, items.map((it) => ({ ...it, id: uid() })))
+      setMeals((prev) => (prev.some((m) => m.id === savedMeal.id) ? prev : [...prev, savedMeal]))
+      fireConfetti()
+      hapticCelebrate()
+    } catch (err) {
+      setStatusMessage(err instanceof Error ? err.message : 'Failed to save meal to Supabase.')
+    }
+  }
+
   /**
    * Menu path's final step (Phase 3, Restaurant/Takeaway Mode), run once MenuCapture has
    * resolved the user's confirmed dish selection through Open Food Facts. `meta.photo` is
@@ -410,11 +446,19 @@ export default function App() {
           so none of them had to change their own data-fetching logic. */}
       {activeTab === 'today' && (
         <>
-          <TodayRing totals={totals} goals={goals ?? DEFAULT_GOALS} />
+          <TodayRing totals={totals} goals={goals ?? DEFAULT_GOALS} caloriesBurned={caloriesBurned} />
+          <RecentMeals
+            userId={userId}
+            todaysMealCount={meals.length}
+            onQuickLog={handleQuickLog}
+            onRepeatForEdit={handleRepeatForEdit}
+          />
           {/* Phase 5, Healthy Score — added alongside TodayRing, not replacing any part of it
               (see HealthyScoreGauge.tsx's own header comment for why). */}
           <HealthyScoreGauge totals={totals} goals={goals ?? DEFAULT_GOALS} todaysMeals={meals} />
           <StreakBanner userId={userId} todaysMealCount={meals.length} />
+          <WorkoutTracker userId={userId} onBurnedChange={setCaloriesBurned} />
+          <WaterTracker />
           <MealTimeline meals={meals} />
           <TipsTicker meals={meals} goals={goals ?? DEFAULT_GOALS} />
         </>

@@ -1,3 +1,5 @@
+import type { MicronutrientProfile } from '@/lib/micronutrients'
+
 /** A single identified food item within a logged meal, editable before/after confirm. */
 export interface FoodItem {
   id: string
@@ -13,6 +15,10 @@ export interface FoodItem {
    * MyFitnessPal gates parts of this) -- NUTRYOS offers it free. */
   fiberG?: number
   sugarG?: number
+  /** Vitamin C/calcium/iron/potassium (free) + vitamin A/B12/magnesium/zinc (Premium) — see
+   * micronutrients.ts. Only present for OFF-sourced (branded/packaged) items; the common-foods
+   * whole-food dataset doesn't have verified per-item micronutrient data yet. */
+  micronutrients?: MicronutrientProfile
   /** Open Food Facts product code this lookup resolved to, if any (barcode/text match). */
   offCode?: string
   /** True once the "Adjust for restaurant prep" nudge (Phase 3, Restaurant/Takeaway Mode) has

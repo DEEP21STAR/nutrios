@@ -8,6 +8,7 @@
 
 import { matchCommonFood } from '@/lib/commonFoods'
 import { getCachedFoodLookup, cacheFoodLookup } from '@/lib/offlineFoodCache'
+import { extractMicronutrientsPer100g, scaleMicronutrients, type MicronutrientProfile } from '@/lib/micronutrients'
 
 export interface OffMacros {
   code: string
@@ -21,6 +22,9 @@ export interface OffMacros {
    * keys, not guessed). */
   fiberPer100gG?: number
   sugarPer100gG?: number
+  /** Per-100g, from OFF's nutriments_estimated block — see micronutrients.ts. Undefined for the
+   * common-foods dataset (not sourced for those, see that file's own comment on scope). */
+  micronutrientsPer100g?: MicronutrientProfile
 }
 
 interface OffSearchResponse {
@@ -29,6 +33,7 @@ interface OffSearchResponse {
     product_name?: string
     product_name_en?: string
     nutriments?: Record<string, number>
+    nutriments_estimated?: Record<string, number>
   }>
 }
 
@@ -73,7 +78,7 @@ export async function lookupFoodMacros(query: string): Promise<OffMacros | null>
 
   const url = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(
     query,
-  )}&search_simple=1&action=process&json=1&page_size=5&fields=code,product_name,product_name_en,nutriments`
+  )}&search_simple=1&action=process&json=1&page_size=5&fields=code,product_name,product_name_en,nutriments,nutriments_estimated`
 
   let res = await fetch(url)
   if (!res.ok && res.status >= 500) {
@@ -123,6 +128,7 @@ export async function lookupFoodMacros(query: string): Promise<OffMacros | null>
     carbsPer100gG: n['carbohydrates_100g'] ?? 0,
     fiberPer100gG: n['fiber_100g'],
     sugarPer100gG: n['sugars_100g'],
+    micronutrientsPer100g: best.nutriments_estimated ? extractMicronutrientsPer100g(best.nutriments_estimated) : undefined,
   }
   cacheFoodLookup(query, result)
   return result
@@ -138,7 +144,7 @@ export async function lookupFoodMacros(query: string): Promise<OffMacros | null>
 export async function lookupByBarcode(barcode: string): Promise<OffMacros | null> {
   const url = `https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(
     barcode,
-  )}.json?fields=code,product_name,product_name_en,nutriments`
+  )}.json?fields=code,product_name,product_name_en,nutriments,nutriments_estimated`
 
   let res = await fetch(url)
   if (!res.ok && res.status >= 500) {
@@ -149,7 +155,13 @@ export async function lookupByBarcode(barcode: string): Promise<OffMacros | null
 
   const data = (await res.json()) as {
     status?: number
-    product?: { code?: string; product_name?: string; product_name_en?: string; nutriments?: Record<string, number> }
+    product?: {
+      code?: string
+      product_name?: string
+      product_name_en?: string
+      nutriments?: Record<string, number>
+      nutriments_estimated?: Record<string, number>
+    }
   }
   if (data.status !== 1 || !data.product?.nutriments) return null
 
@@ -163,6 +175,9 @@ export async function lookupByBarcode(barcode: string): Promise<OffMacros | null
     carbsPer100gG: n['carbohydrates_100g'] ?? 0,
     fiberPer100gG: n['fiber_100g'],
     sugarPer100gG: n['sugars_100g'],
+    micronutrientsPer100g: data.product.nutriments_estimated
+      ? extractMicronutrientsPer100g(data.product.nutriments_estimated)
+      : undefined,
   }
 }
 
@@ -176,5 +191,6 @@ export function scaleToPortion(off: OffMacros, grams: number) {
     carbsG: Math.round(off.carbsPer100gG * factor * 10) / 10,
     fiberG: off.fiberPer100gG !== undefined ? Math.round(off.fiberPer100gG * factor * 10) / 10 : undefined,
     sugarG: off.sugarPer100gG !== undefined ? Math.round(off.sugarPer100gG * factor * 10) / 10 : undefined,
+    micronutrients: off.micronutrientsPer100g ? scaleMicronutrients(off.micronutrientsPer100g, grams) : undefined,
   }
 }

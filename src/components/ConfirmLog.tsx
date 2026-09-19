@@ -5,6 +5,8 @@ import { cn, uid } from '@/lib/utils'
 import { MACRO_COLORS } from '@/components/TodayRing'
 import { GoalImpact } from '@/components/GoalImpact'
 import { applyEatingOutAdjustment, findRepeatVisitSuggestion } from '@/lib/eatingOutAdjustment'
+import { DAILY_VALUES, percentDV } from '@/lib/micronutrients'
+import { isPremiumUnlocked } from '@/lib/premium'
 
 /** Real device haptic tick on slider drag, when the API exists — degrades to nothing (no error, no fake motion) everywhere else. Not gated by prefers-reduced-motion: this is tactile, not visual/animated. */
 function tick() {
@@ -49,7 +51,7 @@ export function ConfirmLog({
    * so every existing call site (which really is always voice today) needs no change; only the
    * new barcode path passes 'barcode' explicitly. */
   photoDataUrl: string | null
-  logSource?: 'voice' | 'barcode'
+  logSource?: 'voice' | 'barcode' | 'repeat'
   initialItems: FoodItem[]
   /** Already-logged meals (App.tsx's real Supabase-backed state), used only for the client-side
    * "you usually get X here" repeat-visit lookup (Phase 3, item 5) — no new query, no mutation. */
@@ -155,6 +157,15 @@ export function ConfirmLog({
               📦
             </span>
             <span className="text-body">Logged from barcode</span>
+          </div>
+        ) : logSource === 'repeat' ? (
+          // Re-logged from a past meal (RecentMeals.tsx's long-press-to-edit path) — same pattern
+          // as barcode/voice, its own icon/color so it reads as "repeated", not miscategorized.
+          <div className="glass-card flex h-32 w-full items-center justify-center gap-2 text-accent-energy shadow-[0_0_24px_4px_var(--glow-energy)]">
+            <span className="text-2xl" aria-hidden>
+              🔁
+            </span>
+            <span className="text-body">Repeated from a past meal</span>
           </div>
         ) : (
           // Voice-logged meal — no photo exists. Same violet AI glow language
@@ -324,6 +335,8 @@ export function ConfirmLog({
               </div>
             )}
 
+            {item.micronutrients && <MicronutrientBadges micronutrients={item.micronutrients} />}
+
             {/* Restaurant-prep nudge (Phase 3, item 3) — only offered while Eating Out is on,
                 one-shot per item (see eatingOutAdjustment.ts for the exact multiplier + the
                 honest reasoning behind it), and always a manual tap — never applied silently. */}
@@ -368,6 +381,51 @@ export function ConfirmLog({
           Log this meal
         </button>
       </div>
+    </div>
+  )
+}
+
+/**
+ * Free tier: 4 key micronutrients as real %DV badges (reads more premium than a raw mg number).
+ * Premium tier: 4 more. Only ever shown for OFF-sourced items that actually have this data (see
+ * FoodItem.micronutrients' own comment on scope) — never a fabricated 0.
+ */
+function MicronutrientBadges({ micronutrients }: { micronutrients: NonNullable<FoodItem['micronutrients']> }) {
+  const premium = isPremiumUnlocked()
+  const freeEntries: Array<[string, number | undefined, number]> = [
+    ['Vit C', micronutrients.vitaminCMg, DAILY_VALUES.vitaminCMg],
+    ['Calcium', micronutrients.calciumMg, DAILY_VALUES.calciumMg],
+    ['Iron', micronutrients.ironMg, DAILY_VALUES.ironMg],
+    ['Potassium', micronutrients.potassiumMg, DAILY_VALUES.potassiumMg],
+  ]
+  const premiumEntries: Array<[string, number | undefined, number]> = [
+    ['Vit A', micronutrients.vitaminAMcg, DAILY_VALUES.vitaminAMcg],
+    ['Vit B12', micronutrients.vitaminB12Mcg, DAILY_VALUES.vitaminB12Mcg],
+    ['Magnesium', micronutrients.magnesiumMg, DAILY_VALUES.magnesiumMg],
+    ['Zinc', micronutrients.zincMg, DAILY_VALUES.zincMg],
+  ]
+  const entries = premium ? [...freeEntries, ...premiumEntries] : freeEntries
+  const visible = entries.filter(([, amount]) => amount !== undefined)
+  if (visible.length === 0) return null
+
+  return (
+    <div className="mt-2 flex flex-wrap gap-1.5">
+      {visible.map(([label, amount, dv]) => {
+        const pct = percentDV(amount, dv)
+        return (
+          <span
+            key={label}
+            className="rounded-full border border-accent-ai/30 bg-accent-ai/10 px-2 py-0.5 text-[11px] text-accent-ai"
+          >
+            {label} {pct}% DV
+          </span>
+        )
+      })}
+      {!premium && premiumEntries.some(([, amount]) => amount !== undefined) && (
+        <span className="rounded-full border border-white/10 px-2 py-0.5 text-[11px] text-text-tertiary">
+          +{premiumEntries.filter(([, amount]) => amount !== undefined).length} more with Premium
+        </span>
+      )}
     </div>
   )
 }

@@ -23,10 +23,22 @@ export function ringColorForRemaining(remainingPct: number): string {
  * stroke-dasharray/dashoffset, now GSAP elastic-fill) and CountUp (kinetic
  * digit count-up) components, same totals/goals data model.
  */
-export function TodayRing({ totals, goals }: { totals: MacroTotals; goals: Goals }) {
-  const caloriePct = (totals.calories / goals.calorieGoal) * 100
-  const remaining = Math.max(0, goals.calorieGoal - totals.calories)
-  const remainingPct = (remaining / goals.calorieGoal) * 100
+export function TodayRing({
+  totals,
+  goals,
+  caloriesBurned = 0,
+}: {
+  totals: MacroTotals
+  goals: Goals
+  /** Today's real logged workout burn (see WorkoutTracker.tsx) — extends the effective calorie
+   * budget the same way every mainstream calorie tracker treats exercise, rather than a workout
+   * silently having no effect on "calories left". */
+  caloriesBurned?: number
+}) {
+  const effectiveGoal = goals.calorieGoal + caloriesBurned
+  const caloriePct = (totals.calories / effectiveGoal) * 100
+  const remaining = Math.max(0, effectiveGoal - totals.calories)
+  const remainingPct = (remaining / effectiveGoal) * 100
   const ringColor = ringColorForRemaining(remainingPct)
 
   return (
@@ -61,7 +73,9 @@ export function TodayRing({ totals, goals }: { totals: MacroTotals; goals: Goals
       </div>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         <CountUp value={totals.calories} decimals={0} className="text-display text-text-primary" />
-        <span className="text-caption text-text-tertiary">of {goals.calorieGoal} kcal</span>
+        <span className="text-caption text-text-tertiary">
+          of {effectiveGoal} kcal{caloriesBurned > 0 && ` (+${caloriesBurned} burned)`}
+        </span>
         <span className="text-caption mt-1" style={{ color: ringColor }}>
           {Math.round(remaining)} kcal left
         </span>
