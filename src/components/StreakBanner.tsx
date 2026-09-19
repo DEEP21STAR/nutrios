@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
-import { Flame, Snowflake } from 'lucide-react'
+import { Flame, Snowflake, Share2 } from 'lucide-react'
 import type { Meal } from '@/lib/types'
 import { listMealsSince } from '@/lib/mealsRepo'
 import { getStreakFreezeStatus, spendFreeze } from '@/lib/streakFreeze'
 import { fireStreakConfetti } from '@/lib/confetti'
-import { hapticSuccess } from '@/lib/haptics'
+import { hapticSuccess, hapticTap } from '@/lib/haptics'
+import { MilestoneShareCard } from '@/components/MilestoneShareCard'
 
 const HISTORY_DAYS = 14
 
@@ -17,9 +18,18 @@ const HISTORY_DAYS = 14
  * streak could never read higher than 1 and a missed-day rescue could never be detected --
  * caught by seeding real multi-day test data and watching the rescue banner never appear.
  */
-export function StreakBanner({ userId, todaysMealCount }: { userId: string | null; todaysMealCount: number }) {
+export function StreakBanner({
+  userId,
+  todaysMealCount,
+  displayName,
+}: {
+  userId: string | null
+  todaysMealCount: number
+  displayName?: string | null
+}) {
   const [historyMeals, setHistoryMeals] = useState<Meal[] | null>(null)
   const [rescued, setRescued] = useState(false)
+  const [sharing, setSharing] = useState(false)
 
   useEffect(() => {
     if (!userId) return
@@ -67,15 +77,42 @@ export function StreakBanner({ userId, todaysMealCount }: { userId: string | nul
         </div>
       </div>
 
-      {status.rescueDate && !rescued && (
-        <button
-          onClick={handleRescue}
-          className="shrink-0 rounded-xl bg-accent-health px-3 py-2 text-caption font-semibold text-bg-primary"
-        >
-          Use a freeze
-        </button>
+      <div className="flex shrink-0 items-center gap-2">
+        {status.effectiveStreak > 0 && (
+          <button
+            onClick={() => {
+              hapticTap()
+              setSharing(true)
+            }}
+            aria-label="Share streak"
+            className="rounded-xl border border-white/10 bg-bg-secondary p-2 text-accent-energy"
+          >
+            <Share2 size={16} />
+          </button>
+        )}
+        {status.rescueDate && !rescued && (
+          <button
+            onClick={handleRescue}
+            className="rounded-xl bg-accent-health px-3 py-2 text-caption font-semibold text-bg-primary"
+          >
+            Use a freeze
+          </button>
+        )}
+        {rescued && <span className="text-caption text-accent-health">Streak saved</span>}
+      </div>
+
+      {sharing && (
+        <MilestoneShareCard
+          eyebrow="Logging streak"
+          headline={`${status.effectiveStreak} day${status.effectiveStreak === 1 ? '' : 's'} in a row`}
+          bigNumber={status.effectiveStreak}
+          bigNumberLabel={`day${status.effectiveStreak === 1 ? '' : 's'} logged`}
+          icon="🔥"
+          accentColor="#ffb800"
+          name={displayName}
+          onClose={() => setSharing(false)}
+        />
       )}
-      {rescued && <span className="shrink-0 text-caption text-accent-health">Streak saved</span>}
     </div>
   )
 }

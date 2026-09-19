@@ -1,9 +1,11 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { Share2 } from 'lucide-react'
 import type { Goals, Meal } from '@/lib/types'
 import { computeBadges, getNewlyEarnedBadges, type Badge } from '@/lib/achievements'
 import { cn } from '@/lib/utils'
 import { fireConfetti, fireStreakConfetti, fireBullseyeConfetti } from '@/lib/confetti'
-import { hapticCelebrate } from '@/lib/haptics'
+import { hapticCelebrate, hapticTap } from '@/lib/haptics'
+import { MilestoneShareCard } from '@/components/MilestoneShareCard'
 
 /**
  * Achievements/badges (Phase 4) — every badge is computed live from the real `meals` array
@@ -12,9 +14,10 @@ import { hapticCelebrate } from '@/lib/haptics'
  * decorative bar. See achievements.ts's own header comment for why this is fully client-computed
  * rather than backed by a new Supabase table/column.
  */
-export function Achievements({ meals, goals }: { meals: Meal[]; goals: Goals }) {
+export function Achievements({ meals, goals, displayName }: { meals: Meal[]; goals: Goals; displayName?: string | null }) {
   const badges = useMemo(() => computeBadges(meals, goals), [meals, goals])
   const earnedCount = badges.filter((b) => b.earned).length
+  const [sharingBadge, setSharingBadge] = useState<Badge | null>(null)
 
   // Fire a celebration exactly once per newly-earned badge (per device — see achievements.ts).
   // Runs after every real meals/goals change, not on every render, via the same dependency array.
@@ -39,22 +42,54 @@ export function Achievements({ meals, goals }: { meals: Meal[]; goals: Goals }) 
       </div>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         {badges.map((badge) => (
-          <BadgeCard key={badge.id} badge={badge} />
+          <BadgeCard
+            key={badge.id}
+            badge={badge}
+            onShare={
+              badge.earned
+                ? () => {
+                    hapticTap()
+                    setSharingBadge(badge)
+                  }
+                : undefined
+            }
+          />
         ))}
       </div>
+
+      {sharingBadge && (
+        <MilestoneShareCard
+          eyebrow="Achievement unlocked"
+          headline={sharingBadge.title}
+          bigNumber={sharingBadge.progressTarget}
+          bigNumberLabel={sharingBadge.description}
+          icon={sharingBadge.icon}
+          accentColor="#00e5a0"
+          name={displayName}
+          onClose={() => setSharingBadge(null)}
+        />
+      )}
     </section>
   )
 }
 
-function BadgeCard({ badge }: { badge: Badge }) {
+function BadgeCard({ badge, onShare }: { badge: Badge; onShare?: () => void }) {
   const pct = Math.min(100, (badge.progressCurrent / badge.progressTarget) * 100)
   return (
     <div
+      onClick={onShare}
+      role={onShare ? 'button' : undefined}
       className={cn(
-        'glass-card flex flex-col items-center gap-1 p-3 text-center',
+        'glass-card relative flex flex-col items-center gap-1 p-3 text-center',
         badge.earned ? 'shadow-[0_0_16px_2px_var(--glow-health)]' : 'opacity-70',
+        onShare && 'cursor-pointer active:scale-95',
       )}
     >
+      {onShare && (
+        <span className="absolute right-1.5 top-1.5 text-[11px] text-accent-health" aria-hidden>
+          <Share2 size={12} />
+        </span>
+      )}
       <span className="text-2xl" aria-hidden>
         {badge.icon}
       </span>

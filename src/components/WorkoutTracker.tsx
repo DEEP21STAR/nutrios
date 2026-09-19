@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
-import { Flame } from 'lucide-react'
+import { Flame, Share2 } from 'lucide-react'
 import { WORKOUT_TYPES, estimateCaloriesBurned } from '@/lib/workouts'
 import { insertWorkout, listTodayWorkouts, WorkoutTableMissingError, type WorkoutLog } from '@/lib/workoutsRepo'
 import { listWeightLogsSince } from '@/lib/weightRepo'
 import { hapticCelebrate, hapticTap } from '@/lib/haptics'
 import { fireStreakConfetti } from '@/lib/confetti'
+import { MilestoneShareCard } from '@/components/MilestoneShareCard'
 
 const WORKOUT_COLOR = '#fb7185'
 
@@ -13,10 +14,19 @@ const WORKOUT_COLOR = '#fb7185'
  * section" (see workouts.ts's own header comment for the real product-scope reasoning). Owns its
  * own today-only fetch, same self-contained pattern as StreakBanner/WaterTracker.
  */
-export function WorkoutTracker({ userId, onBurnedChange }: { userId: string | null; onBurnedChange?: (kcal: number) => void }) {
+export function WorkoutTracker({
+  userId,
+  onBurnedChange,
+  displayName,
+}: {
+  userId: string | null
+  onBurnedChange?: (kcal: number) => void
+  displayName?: string | null
+}) {
   const [workouts, setWorkouts] = useState<WorkoutLog[] | null>(null)
   const [tableMissing, setTableMissing] = useState(false)
   const [showForm, setShowForm] = useState(false)
+  const [sharingWorkout, setSharingWorkout] = useState<WorkoutLog | null>(null)
 
   async function refresh() {
     if (!userId) return
@@ -66,7 +76,19 @@ export function WorkoutTracker({ userId, onBurnedChange }: { userId: string | nu
                 <span className="text-text-secondary">
                   {WORKOUT_TYPES.find((t) => t.id === w.workoutType)?.label ?? w.workoutType} · {w.durationMin} min
                 </span>
-                <span style={{ color: WORKOUT_COLOR }}>{w.caloriesBurned} kcal</span>
+                <span className="flex items-center gap-2">
+                  <span style={{ color: WORKOUT_COLOR }}>{w.caloriesBurned} kcal</span>
+                  <button
+                    onClick={() => {
+                      hapticTap()
+                      setSharingWorkout(w)
+                    }}
+                    aria-label="Share workout"
+                    style={{ color: WORKOUT_COLOR }}
+                  >
+                    <Share2 size={13} />
+                  </button>
+                </span>
               </div>
             ))}
           </div>
@@ -92,6 +114,19 @@ export function WorkoutTracker({ userId, onBurnedChange }: { userId: string | nu
             setShowForm(false)
             refresh()
           }}
+        />
+      )}
+
+      {sharingWorkout && (
+        <MilestoneShareCard
+          eyebrow={WORKOUT_TYPES.find((t) => t.id === sharingWorkout.workoutType)?.label ?? sharingWorkout.workoutType}
+          headline={`${sharingWorkout.durationMin} minute workout`}
+          bigNumber={sharingWorkout.caloriesBurned}
+          bigNumberLabel="kcal burned"
+          icon="🔥"
+          accentColor={WORKOUT_COLOR}
+          name={displayName}
+          onClose={() => setSharingWorkout(null)}
         />
       )}
     </>

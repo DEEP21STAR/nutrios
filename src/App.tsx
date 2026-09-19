@@ -506,8 +506,8 @@ export default function App() {
           {/* Phase 5, Healthy Score — added alongside TodayRing, not replacing any part of it
               (see HealthyScoreGauge.tsx's own header comment for why). */}
           <HealthyScoreGauge totals={totals} goals={goals ?? DEFAULT_GOALS} todaysMeals={meals} />
-          <StreakBanner userId={userId} todaysMealCount={meals.length} />
-          <WorkoutTracker userId={userId} onBurnedChange={setCaloriesBurned} />
+          <StreakBanner userId={userId} todaysMealCount={meals.length} displayName={displayName} />
+          <WorkoutTracker userId={userId} onBurnedChange={setCaloriesBurned} displayName={displayName} />
           <WaterTracker />
           <MealTimeline meals={meals} />
           <TipsTicker meals={meals} goals={goals ?? DEFAULT_GOALS} />
@@ -518,7 +518,7 @@ export default function App() {
         <>
           {/* Phase 4 — achievements computed from real meal history, see the component's own
               header comment for what's real vs. demo. */}
-          <Achievements meals={meals} goals={goals ?? DEFAULT_GOALS} />
+          <Achievements meals={meals} goals={goals ?? DEFAULT_GOALS} displayName={displayName} />
           {/* Phase 5, Trends & History — real weekly calorie bar chart + weight trend (or its
               honest empty state). */}
           <TrendsHistory userId={userId} goals={goals ?? DEFAULT_GOALS} displayName={displayName} />
